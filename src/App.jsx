@@ -284,24 +284,30 @@ function BracketMatch({m}){
 
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
 function LoginScreen({onLogin}){
+  const[username,setUsername]=useState("");
   const[pin,setPin]=useState("");
+  const[step,setStep]=useState("user");
   const[error,setError]=useState("");
   const[loading,setLoading]=useState(false);
+
+  const handleNext=()=>{
+    if(!username.trim()){setError("Ingresa tu usuario");return;}
+    setError("");setStep("pin");
+  };
 
   const handleLogin=async()=>{
     if(!pin){setError("Ingresa tu PIN");return;}
     setLoading(true);setError("");
-    // Check admin
-    if(pin===ADMIN.pin){onLogin({...ADMIN});setLoading(false);return;}
-    // Check participants in Firebase
+    const name=username.trim();
+    if(name.toLowerCase()==="aldley"&&pin===ADMIN.pin){onLogin({...ADMIN});setLoading(false);return;}
     try{
       const snap=await get(ref(db,"participants"));
       if(snap.exists()){
         const data=snap.val();
-        const found=Object.values(data).find(p=>p.pin===pin);
+        const found=Object.values(data).find(p=>p.name.toLowerCase()===name.toLowerCase()&&p.pin===pin);
         if(found){onLogin({...found,isAdmin:false});setLoading(false);return;}
       }
-      setError("PIN incorrecto");
+      setError("Usuario o PIN incorrecto");setStep("user");setPin("");
     }catch(e){setError("Error de conexión");}
     setLoading(false);
   };
@@ -309,31 +315,68 @@ function LoginScreen({onLogin}){
   return(
     <div className="login-wrap">
       <div className="login-card">
-        <div className="login-logo">⚽</div>
-        <div className="login-title">MUNDIAL <span>2026</span></div>
+        <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" style={{width:150,height:"auto",marginBottom:4}}>
+          <text x="2" y="220" fontFamily="Arial Black,sans-serif" fontSize="230" fontWeight="900" fill="white">2</text>
+          <text x="148" y="220" fontFamily="Arial Black,sans-serif" fontSize="230" fontWeight="900" fill="white">6</text>
+          <g transform="translate(88,10)">
+            <ellipse cx="55" cy="115" rx="40" ry="52" fill="#b8902a"/>
+            <ellipse cx="55" cy="75" rx="37" ry="37" fill="#c9a227"/>
+            <ellipse cx="55" cy="65" rx="32" ry="30" fill="#d4b23a"/>
+            <path d="M23 88 Q6 76 12 52 Q28 78 23 88Z" fill="#b8902a"/>
+            <path d="M87 88 Q104 76 98 52 Q82 78 87 88Z" fill="#b8902a"/>
+            <rect x="40" y="152" width="30" height="16" fill="#1a6b2e" rx="2"/>
+            <rect x="27" y="164" width="56" height="10" fill="#c9a227" rx="2"/>
+            <text x="55" y="137" fontFamily="Arial" fontSize="9" fontWeight="bold" fill="#0a3a10" textAnchor="middle">FIFA</text>
+            <text x="55" y="148" fontFamily="Arial" fontSize="6.5" fontWeight="bold" fill="#0a3a10" textAnchor="middle">WORLD CUP</text>
+          </g>
+          <text x="150" y="285" fontFamily="Arial Black,sans-serif" fontSize="48" fontWeight="900" fill="white" textAnchor="middle">FIFA</text>
+        </svg>
+
         <div className="login-sub">USA · CANADA · MÉXICO</div>
-        <div className="login-form">
-          <div className="pin-display">{pin.replace(/./g,"●")||<span style={{color:"var(--muted)"}}>––––</span>}</div>
-          <div className="pin-pad">
-            {[1,2,3,4,5,6,7,8,9,"","0","⌫"].map((k,i)=>(
-              <button key={i} className={`pin-key ${k===""?"invisible":""}`}
-                onClick={()=>{
-                  if(k==="⌫")setPin(p=>p.slice(0,-1));
-                  else if(k!=="")setPin(p=>p.length<8?p+k:p);
-                }}>
-                {k}
-              </button>
-            ))}
+
+        {step==="user"?(
+          <div style={{width:"100%"}}>
+            <input className="login-user-input" placeholder="Tu usuario" value={username}
+              onChange={e=>{setUsername(e.target.value);setError("");}}
+              onKeyDown={e=>e.key==="Enter"&&handleNext()} autoFocus/>
+            {error&&<div className="login-error">{error}</div>}
+            <button className="login-btn" onClick={handleNext} style={{marginTop:4}}>SIGUIENTE →</button>
           </div>
-          {error&&<div className="login-error">{error}</div>}
-          <button className="login-btn" onClick={handleLogin} disabled={loading}>
-            {loading?"Verificando...":"ENTRAR"}
-          </button>
+        ):(
+          <div style={{width:"100%"}}>
+            <div style={{fontSize:12,color:"var(--muted)",marginBottom:10,textAlign:"center"}}>
+              Hola <strong style={{color:"var(--text)"}}>{username}</strong> · ingresa tu PIN
+            </div>
+            <div className="pin-display">
+              {pin.length>0?pin.replace(/./g,"●"):<span style={{color:"var(--muted)",letterSpacing:4}}>––––</span>}
+            </div>
+            <div className="pin-pad">
+              {[1,2,3,4,5,6,7,8,9,"","0","⌫"].map((k,i)=>(
+                <button key={i} className={`pin-key ${k===""?"invisible":""}`}
+                  onClick={()=>{if(k==="⌫")setPin(p=>p.slice(0,-1));else if(k!=="")setPin(p=>p.length<8?p+k:p);}}>
+                  {k}
+                </button>
+              ))}
+            </div>
+            {error&&<div className="login-error">{error}</div>}
+            <button className="login-btn" onClick={handleLogin} disabled={loading}>
+              {loading?"Verificando...":"ENTRAR"}
+            </button>
+            <button onClick={()=>{setStep("user");setPin("");setError("");}}
+              style={{background:"none",border:"none",color:"var(--muted)",fontSize:11,cursor:"pointer",marginTop:10,display:"block",width:"100%"}}>
+              ← Cambiar usuario
+            </button>
+          </div>
+        )}
+
+        <div style={{marginTop:20,fontSize:10,color:"var(--muted)",borderTop:"1px solid var(--border)",paddingTop:12,letterSpacing:1,width:"100%",textAlign:"center"}}>
+          Creado por <strong style={{color:"var(--accent)"}}>antoniobuenomx</strong>
         </div>
       </div>
     </div>
   );
 }
+
 
 // ─── ADMIN: ADD PARTICIPANT ───────────────────────────────────────────────────
 function AddParticipantModal({onClose}){
