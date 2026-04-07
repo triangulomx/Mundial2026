@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import { ref, onValue, set, update, get } from "firebase/database";
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
-const ADMIN = { name: "Aldley", pin: "180613", isAdmin: true };
+const ADMIN = { name: "Admin", pin: "180613", isAdmin: true };
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const INAUGURAL = new Date("2026-06-11T12:00:00-06:00");
@@ -435,17 +435,11 @@ async function exportQuiniela(user, quinielaMatchIds, matches, preds, podio) {
 function LoginScreen({onLogin}){
   const[username,setUsername]=useState("");
   const[pin,setPin]=useState("");
-  const[step,setStep]=useState("user");
   const[error,setError]=useState("");
   const[loading,setLoading]=useState(false);
 
-  const handleNext=()=>{
-    if(!username.trim()){setError("Ingresa tu usuario");return;}
-    setError("");setStep("pin");
-    setTimeout(()=>{},100);
-  };
-
   const handleLogin=async()=>{
+    if(!username.trim()){setError("Ingresa tu usuario");return;}
     if(!pin){setError("Ingresa tu PIN");return;}
     setLoading(true);setError("");
     const name=username.trim();
@@ -457,7 +451,7 @@ function LoginScreen({onLogin}){
         const found=Object.values(data).find(p=>p.name.toLowerCase()===name.toLowerCase()&&p.pin===pin);
         if(found){onLogin({...found,isAdmin:false});setLoading(false);return;}
       }
-      setError("Usuario o PIN incorrecto");setStep("user");setPin("");
+      setError("Usuario o PIN incorrecto");setPin("");
     }catch(e){setError("Error de conexión");}
     setLoading(false);
   };
@@ -465,7 +459,7 @@ function LoginScreen({onLogin}){
   return(
     <div className="login-wrap">
       <div className="login-card">
-        <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" style={{width:150,height:"auto",marginBottom:4}}>
+        <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg" style={{width:140,height:"auto",marginBottom:4}}>
           <text x="2" y="220" fontFamily="Arial Black,sans-serif" fontSize="230" fontWeight="900" fill="white">2</text>
           <text x="148" y="220" fontFamily="Arial Black,sans-serif" fontSize="230" fontWeight="900" fill="white">6</text>
           <g transform="translate(88,10)">
@@ -484,42 +478,33 @@ function LoginScreen({onLogin}){
 
         <div className="login-sub">USA · CANADA · MÉXICO</div>
 
-        {step==="user"?(
-          <div style={{width:"100%"}}>
-            <input className="login-user-input" placeholder="Tu usuario" value={username}
-              onChange={e=>{setUsername(e.target.value);setError("");}}
-              onKeyDown={e=>e.key==="Enter"&&handleNext()} autoFocus/>
-            {error&&<div className="login-error">{error}</div>}
-            <button className="login-btn" onClick={handleNext} style={{marginTop:4}}>SIGUIENTE →</button>
+        <div style={{width:"100%"}}>
+          <input
+            className="login-user-input"
+            placeholder="Usuario"
+            value={username}
+            onChange={e=>{setUsername(e.target.value);setError("");}}
+            onKeyDown={e=>e.key==="Enter"&&handleLogin()}
+            autoFocus
+          />
+          <div className="pin-display">
+            {pin.length>0?pin.replace(/./g,"●"):<span style={{color:"var(--muted)",letterSpacing:4}}>––––</span>}
           </div>
-        ):(
-          <div style={{width:"100%"}}>
-            <div style={{fontSize:12,color:"var(--muted)",marginBottom:10,textAlign:"center"}}>
-              Hola <strong style={{color:"var(--text)"}}>{username}</strong> · ingresa tu PIN
-            </div>
-            <div className="pin-display">
-              {pin.length>0?pin.replace(/./g,"●"):<span style={{color:"var(--muted)",letterSpacing:4}}>––––</span>}
-            </div>
-            <div className="pin-pad">
-              {[1,2,3,4,5,6,7,8,9,"","0","⌫"].map((k,i)=>(
-                <button key={i} className={`pin-key ${k===""?"invisible":""}`}
-                  onClick={()=>{if(k==="⌫")setPin(p=>p.slice(0,-1));else if(k!=="")setPin(p=>p.length<8?p+k:p);}}>
-                  {k}
-                </button>
-              ))}
-            </div>
-            {error&&<div className="login-error">{error}</div>}
-            <button className="login-btn" onClick={handleLogin} disabled={loading}>
-              {loading?"Verificando...":"ENTRAR"}
-            </button>
-            <button onClick={()=>{setStep("user");setPin("");setError("");}}
-              style={{background:"none",border:"none",color:"var(--muted)",fontSize:11,cursor:"pointer",marginTop:10,display:"block",width:"100%"}}>
-              ← Cambiar usuario
-            </button>
+          <div className="pin-pad">
+            {[1,2,3,4,5,6,7,8,9,"","0","⌫"].map((k,i)=>(
+              <button key={i} className={`pin-key ${k===""?"invisible":""}`}
+                onClick={()=>{if(k==="⌫")setPin(p=>p.slice(0,-1));else if(k!=="")setPin(p=>p.length<8?p+k:p);}}>
+                {k}
+              </button>
+            ))}
           </div>
-        )}
+          {error&&<div className="login-error">{error}</div>}
+          <button className="login-btn" onClick={handleLogin} disabled={loading}>
+            {loading?"Verificando...":"ENTRAR"}
+          </button>
+        </div>
 
-        <div style={{marginTop:20,fontSize:10,color:"var(--muted)",borderTop:"1px solid var(--border)",paddingTop:12,letterSpacing:1,width:"100%",textAlign:"center"}}>
+        <div style={{marginTop:16,fontSize:10,color:"var(--muted)",borderTop:"1px solid var(--border)",paddingTop:12,letterSpacing:1,width:"100%",textAlign:"center"}}>
           Creado por <strong style={{color:"var(--accent)"}}>antoniobuenomx</strong>
         </div>
       </div>
