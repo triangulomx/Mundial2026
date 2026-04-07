@@ -3,7 +3,7 @@ import { db } from "./firebase";
 import { ref, onValue, set, update, get } from "firebase/database";
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
-const ADMIN = { name: "Admin", pin: "180613", isAdmin: true };
+const ADMIN = { name: "Aldley", pin: "180613", isAdmin: true };
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const INAUGURAL = new Date("2026-06-11T12:00:00-06:00");
@@ -797,11 +797,19 @@ export default function Mundial2026(){
 
   // ── Participant: save prediction L/E/V
   const savePred=async(pid,mid,result)=>{
+    const p=participants[pid];
+    if(p?.quinielaLocked&&!isAdmin)return;
     await set(ref(db,`participants/${pid}/predictions/${mid}`),{result});
   };
   // ── Participant: save podio prediction
   const savePodio=async(pid,field,team)=>{
+    const p=participants[pid];
+    if(p?.quinielaLocked&&!isAdmin)return;
     await set(ref(db,`participants/${pid}/predictions/podio/${field}`),team);
+  };
+  // ── Lock / unlock quiniela
+  const lockQuiniela=async(pid,locked)=>{
+    await update(ref(db,`participants/${pid}`),{quinielaLocked:locked});
   };
 
   // ── Admin: update jornada stat
@@ -1251,9 +1259,13 @@ export default function Mundial2026(){
 
                 {!isAdmin&&myId&&(
                   <div className="card">
-                    <div className="card-title" style={{justifyContent:"space-between"}}>
-                      <span>✏️ Mis Pronósticos</span>
-                      {quinielaMatches.length>0&&<button className="q-btn" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>exportQuiniela(user,quinielaMatches,matches,myPreds,myData?.predictions?.podio||{})}>📥 Descargar</button>}
+                    <div className="card-title" style={{justifyContent:"space-between",flexWrap:"wrap",gap:6}}>
+                      <span>{myData?.quinielaLocked?"🔒 Quiniela Guardada":"✏️ Mis Pronósticos"}</span>
+                      <div style={{display:"flex",gap:6}}>
+                        {quinielaMatches.length>0&&<button className="q-btn" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>exportQuiniela(user,quinielaMatches,matches,myPreds,myData?.predictions?.podio||{})}>📥 Descargar</button>}
+                        {quinielaMatches.length>0&&!myData?.quinielaLocked&&<button className="q-btn" style={{fontSize:11,padding:"5px 10px",background:"var(--green)"}} onClick={()=>lockQuiniela(myId,true)}>🔒 Guardar</button>}
+                        {quinielaMatches.length>0&&myData?.quinielaLocked&&isAdmin&&<button className="q-btn" style={{fontSize:11,padding:"5px 10px",background:"var(--accent2)"}} onClick={()=>lockQuiniela(myId,false)}>🔓 Desbloquear</button>}
+                      </div>
                     </div>
                     <div className="card-body">
                       {quinielaMatches.length===0
@@ -1277,8 +1289,9 @@ export default function Mundial2026(){
                                       const selected=pred.result===opt;
                                       const isCorrect=m.played&&real===opt;
                                       const isWrong=m.played&&selected&&real!==opt;
+                                      const isLocked=myData?.quinielaLocked&&!isAdmin;
                                       return(
-                                        <button key={opt} disabled={m.played}
+                                        <button key={opt} disabled={m.played||isLocked}
                                           onClick={()=>savePred(myId,mid,opt)}
                                           style={{
                                             width:32,height:28,borderRadius:5,border:"1px solid",
@@ -1308,7 +1321,7 @@ export default function Mundial2026(){
                               return(
                                 <div key={key} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                                   <span style={{fontSize:11,fontWeight:600,width:90,flexShrink:0}}>{label}</span>
-                                  <select value={current} onChange={e=>savePodio(myId,key,e.target.value)}
+                                  <select value={current} disabled={myData?.quinielaLocked&&!isAdmin} onChange={e=>savePodio(myId,key,e.target.value)}
                                     style={{flex:1,padding:"5px 8px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text)",fontSize:11,outline:"none"}}>
                                     <option value="">— Selecciona —</option>
                                     {allTeams.map(t=><option key={t} value={t}>{flag(t)} {t}</option>)}
@@ -1449,9 +1462,13 @@ export default function Mundial2026(){
                             <div style={{fontWeight:700,fontSize:13}}>{p.name}</div>
                             <div style={{fontSize:10,color:"var(--muted)"}}>PIN: {p.pin} · {Object.values(p.lineup||{}).filter(Boolean).length}/11 jugadores</div>
                           </div>
-                          <div style={{textAlign:"right"}}>
+                          <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
                             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"var(--accent)"}}>{score?.total||0} pts</div>
                             <div style={{fontSize:9,color:"var(--muted)"}}>Q:{score?.quiniela||0} · 11:{score?.once||0}</div>
+                            {p.quinielaLocked
+                              ?<button onClick={()=>lockQuiniela(p.id,false)} style={{fontSize:10,padding:"3px 8px",background:"rgba(239,68,68,.15)",border:"1px solid var(--accent2)",borderRadius:6,color:"var(--accent2)",cursor:"pointer"}}>🔓 Desbloquear</button>
+                              :<span style={{fontSize:10,color:"var(--muted)"}}>Sin guardar</span>
+                            }
                           </div>
                         </div>
                       );
