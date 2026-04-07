@@ -28,21 +28,3 @@ body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-se
 .login-btn { width: 100%; padding: 13px; background: var(--accent); border: none; border-radius: 10px; color: #000; font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px; cursor: pointer; }
 .login-btn:hover { opacity: .9; }
 .login-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-.login-user-input {
-  width: 100%;
-  padding: 14px 16px;
-  background: var(--card2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--text);
-  font-size: 16px;
-  font-family: 'Barlow', sans-serif;
-  font-weight: 600;
-  outline: none;
-  text-align: center;
-  margin-bottom: 12px;
-  letter-spacing: 1px;
-}
-.login-user-input:focus { border-color: var(--accent); }
-.login-user-input::placeholder { color: var(--muted); font-weight: 400; }
