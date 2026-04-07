@@ -122,14 +122,12 @@ function calcPlayerPts(stats, isGK) {
   return pts;
 }
 
+// L=Local gana, E=Empate, V=Visitante gana → 1pt si acierta
 function scoreQuiniela(pred, match) {
-  if (!match?.played || pred?.home === undefined || pred?.home === "") return null;
-  const ph = Number(pred.home), pa = Number(pred.away);
+  if (!match?.played || !pred?.result) return null;
   const rh = match.homeScore, ra = match.awayScore;
-  if (ph === rh && pa === ra) return 3;
-  const pr = ph > pa ? "H" : ph < pa ? "A" : "D";
-  const rr = rh > ra ? "H" : rh < ra ? "A" : "D";
-  return pr === rr ? 1 : 0;
+  const real = rh > ra ? "L" : rh < ra ? "V" : "E";
+  return pred.result === real ? 1 : 0;
 }
 
 function generateGroupMatches() {
@@ -282,6 +280,157 @@ function BracketMatch({m}){
   );
 }
 
+
+// ─── EXPORT QUINIELA AS IMAGE ────────────────────────────────────────────────
+async function exportQuiniela(user, quinielaMatchIds, matches, preds, podio) {
+  const date = new Date().toLocaleDateString("es-MX",{day:"numeric",month:"long",year:"numeric"});
+  const canvas = document.createElement("canvas");
+  const W = 760;
+  const ROW_H = 46;
+  const HEADER = 160;
+  const PODIO_H = 110;
+  const FOOTER = 56;
+  canvas.width = W;
+  canvas.height = HEADER + 34 + quinielaMatchIds.length * ROW_H + PODIO_H + FOOTER;
+  const ctx = canvas.getContext("2d");
+
+  // BG
+  const bg = ctx.createLinearGradient(0,0,W,canvas.height);
+  bg.addColorStop(0,"#080d18"); bg.addColorStop(1,"#0f1923");
+  ctx.fillStyle = bg; ctx.fillRect(0,0,W,canvas.height);
+
+  // Top bar
+  const bar = ctx.createLinearGradient(0,0,W,0);
+  bar.addColorStop(0,"transparent"); bar.addColorStop(0.5,"#f59e0b"); bar.addColorStop(1,"transparent");
+  ctx.fillStyle = bar; ctx.fillRect(0,0,W,3);
+
+  // Header bg
+  ctx.fillStyle = "#162030"; ctx.fillRect(0,3,W,HEADER-3);
+  ctx.strokeStyle = "#1c2d42"; ctx.lineWidth = 1; ctx.strokeRect(0,3,W,HEADER-3);
+
+  // Title
+  ctx.font = "bold 11px Arial"; ctx.fillStyle = "#f59e0b"; ctx.textAlign = "left";
+  ctx.fillText("MUNDIAL 2026  ·  QUINIELA", 28, 36);
+
+  // Player name
+  ctx.font = "bold 48px Arial Black"; ctx.fillStyle = "#fff";
+  ctx.fillText(user.name?.toUpperCase() || "", 28, 88);
+
+  // Date
+  ctx.font = "12px Arial"; ctx.fillStyle = "#64748b";
+  ctx.fillText(`Creado: ${date}`, 28, 112);
+
+  // Points box
+  const scored = quinielaMatchIds.filter(mid => {
+    const m = matches.find(x=>x.id===mid);
+    const pred = preds[mid];
+    const s = (() => {
+      if (!m?.played || !pred?.result) return null;
+      const rh=m.homeScore,ra=m.awayScore;
+      const real=rh>ra?"L":rh<ra?"V":"E";
+      return pred.result===real?1:0;
+    })();
+    return s===1;
+  }).length;
+
+  ctx.fillStyle = "#f59e0b";
+  ctx.beginPath(); ctx.roundRect(W-160,96,130,44,8); ctx.fill();
+  ctx.font = "bold 15px Arial Black"; ctx.fillStyle = "#000"; ctx.textAlign = "center";
+  ctx.fillText(`${scored} pts`, W-95, 121);
+
+  ctx.fillStyle = "#1c2d42"; ctx.fillRect(0,HEADER,W,1);
+
+  // Table header
+  ctx.fillStyle = "#0a1420"; ctx.fillRect(0,HEADER+1,W,32);
+  ctx.font = "bold 9px Arial"; ctx.fillStyle = "#64748b"; ctx.textAlign = "left";
+  ctx.fillText("PARTIDO", 28, HEADER+20);
+  ctx.textAlign = "center";
+  ctx.fillText("L", W/2-30, HEADER+20);
+  ctx.fillText("E", W/2, HEADER+20);
+  ctx.fillText("V", W/2+30, HEADER+20);
+  ctx.fillText("RESULTADO", W-60, HEADER+20);
+
+  // Rows
+  quinielaMatchIds.forEach((mid,idx) => {
+    const m = matches.find(x=>x.id===mid);
+    if(!m) return;
+    const pred = preds[mid]||{};
+    const real = m.played?(m.homeScore>m.awayScore?"L":m.awayScore>m.homeScore?"V":"E"):null;
+    const pts = (!m.played||!pred.result)?null:(pred.result===real?1:0);
+    const y = HEADER + 33 + idx * ROW_H;
+
+    ctx.fillStyle = idx%2===0?"#0f1923":"#111e2d"; ctx.fillRect(0,y,W,ROW_H);
+    if(m.played && pts!==null) {
+      ctx.fillStyle = pts===1?"rgba(16,185,129,0.08)":"rgba(239,68,68,0.06)";
+      ctx.fillRect(0,y,W,ROW_H);
+    }
+    ctx.fillStyle = "#1c2d42"; ctx.fillRect(0,y+ROW_H-1,W,1);
+
+    // Group
+    ctx.font = "bold 12px Arial"; ctx.fillStyle = "#f59e0b"; ctx.textAlign = "left";
+    ctx.fillText(m.group, 12, y+28);
+
+    // Teams
+    ctx.fillStyle = "#e2e8f0"; ctx.font = "11px Arial";
+    const hn = m.home.length>10?m.home.split(" ")[0]:m.home;
+    const an = m.away.length>10?m.away.split(" ")[0]:m.away;
+    ctx.fillText(`${hn} vs ${an}`, 32, y+28);
+
+    // L/E/V buttons
+    ["L","E","V"].forEach((opt,oi) => {
+      const cx = W/2 - 30 + oi*30;
+      const selected = pred.result===opt;
+      const isReal = real===opt;
+      ctx.fillStyle = selected?(pts===1?"#10b981":pts===0?"#ef4444":"#f59e0b"):(isReal&&m.played?"rgba(16,185,129,0.2)":"#162030");
+      ctx.beginPath(); ctx.roundRect(cx-11,y+10,22,22,5); ctx.fill();
+      ctx.strokeStyle = selected?(pts===1?"#10b981":pts===0?"#ef4444":"#f59e0b"):"#1c2d42"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.roundRect(cx-11,y+10,22,22,5); ctx.stroke();
+      ctx.font = "bold 11px Arial"; ctx.fillStyle = selected?"#000":"#64748b"; ctx.textAlign="center";
+      ctx.fillText(opt, cx, y+25);
+    });
+
+    // Result badge
+    if(m.played && pred.result) {
+      ctx.fillStyle = pts===1?"#10b981":"#ef4444";
+      ctx.beginPath(); ctx.roundRect(W-80,y+11,52,24,6); ctx.fill();
+      ctx.font = "bold 13px Arial"; ctx.fillStyle = "#fff"; ctx.textAlign="center";
+      ctx.fillText(pts===1?"+1 ✓":"✗", W-54, y+27);
+    }
+  });
+
+  // PODIO section
+  const py = HEADER + 33 + quinielaMatchIds.length * ROW_H;
+  ctx.fillStyle = "#162030"; ctx.fillRect(0,py,W,PODIO_H);
+  ctx.fillStyle = "#1c2d42"; ctx.fillRect(0,py,W,1);
+  ctx.font = "bold 12px Arial"; ctx.fillStyle = "#f59e0b"; ctx.textAlign="left";
+  ctx.fillText("🏆 PREDICCIÓN DE PODIO", 28, py+22);
+
+  [["champion","🥇 Campeón"],[" runner","🥈 Subcampeón"],["third","🥉 Tercer lugar"]].forEach(([k,label],i) => {
+    const team = podio[k.trim()]||"—";
+    const x = 28 + i * 230;
+    ctx.font = "10px Arial"; ctx.fillStyle = "#64748b"; ctx.textAlign="left";
+    ctx.fillText(label, x, py+44);
+    ctx.font = "bold 13px Arial"; ctx.fillStyle = "#e2e8f0";
+    ctx.fillText(team, x, py+62);
+    ctx.fillStyle = "#1c2d42"; ctx.fillRect(x,py+68,200,1);
+  });
+
+  // Footer
+  const fy = py + PODIO_H;
+  ctx.fillStyle = "#162030"; ctx.fillRect(0,fy,W,FOOTER);
+  ctx.fillStyle = "#1c2d42"; ctx.fillRect(0,fy,W,1);
+  ctx.font = "10px Arial"; ctx.fillStyle = "#64748b"; ctx.textAlign="left";
+  ctx.fillText(`Creado por antoniobuenomx`, 28, fy+24);
+  ctx.fillStyle = "#f59e0b"; ctx.font = "bold 10px Arial"; ctx.textAlign="right";
+  ctx.fillText("⚽ Mundial 2026", W-28, fy+24);
+  ctx.fillStyle = bar; ctx.fillRect(0,canvas.height-3,W,3);
+
+  const link = document.createElement("a");
+  link.download = `quiniela-${(user.name||"jugador").toLowerCase().replace(/\s+/g,"-")}.jpg`;
+  link.href = canvas.toDataURL("image/jpeg",0.92);
+  link.click();
+}
+
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
 function LoginScreen({onLogin}){
   const[username,setUsername]=useState("");
@@ -293,6 +442,7 @@ function LoginScreen({onLogin}){
   const handleNext=()=>{
     if(!username.trim()){setError("Ingresa tu usuario");return;}
     setError("");setStep("pin");
+    setTimeout(()=>{},100);
   };
 
   const handleLogin=async()=>{
@@ -660,9 +810,13 @@ export default function Mundial2026(){
     await set(ref(db,"quinielaMatches"),updated);
   };
 
-  // ── Participant: save prediction
-  const savePred=async(pid,mid,home,away)=>{
-    await set(ref(db,`participants/${pid}/predictions/${mid}`),{home,away});
+  // ── Participant: save prediction L/E/V
+  const savePred=async(pid,mid,result)=>{
+    await set(ref(db,`participants/${pid}/predictions/${mid}`),{result});
+  };
+  // ── Participant: save podio prediction
+  const savePodio=async(pid,field,team)=>{
+    await set(ref(db,`participants/${pid}/predictions/podio/${field}`),team);
   };
 
   // ── Admin: update jornada stat
@@ -674,13 +828,18 @@ export default function Mundial2026(){
   // ── Compute scores for all participants
   const participantScores=useMemo(()=>{
     return Object.values(participants).map(p=>{
-      let qPts=0,exact=0,outcome=0,pending=0;
+      let qPts=0,correct=0,wrong=0,pending=0;
       (quinielaMatches||[]).forEach(mid=>{
         const match=matches.find(m=>m.id===mid);
         const pred=p.predictions?.[mid];
         const s=scoreQuiniela(pred,match);
-        if(s===null)pending++;else if(s===3){qPts+=3;exact++;}else if(s===1){qPts+=1;outcome++;}
+        if(s===null)pending++;else if(s===1){qPts+=1;correct++;}else{wrong++;}
       });
+      // Bonus podio
+      const podio=p.predictions?.podio||{};
+      if(p.predictions?.podio){
+        // scored separately by admin — stored as podio.champion/runner/third pts
+      }
       // Once pts
       let oncePts=0;
       Object.values(p.lineup||{}).forEach(lp=>{
@@ -688,7 +847,7 @@ export default function Mundial2026(){
         const s=jornadaStats?.[safeKey(lp.name)];
         oncePts+=calcPlayerPts(s,lp.isGK);
       });
-      return{...p,quiniela:qPts,once:oncePts,total:qPts+oncePts,exact,outcome,pending};
+      return{...p,quiniela:qPts,once:oncePts,total:qPts+oncePts,correct,wrong,pending};
     }).sort((a,b)=>b.total-a.total);
   },[participants,quinielaMatches,matches,jornadaStats]);
 
@@ -1085,13 +1244,12 @@ export default function Mundial2026(){
         {activeTab==="quiniela"&&(
           <div>
             <div className="two-col">
-              {/* Izquierda: partidos o ranking según rol */}
               <div>
                 {isAdmin&&(
                   <div className="card" style={{marginBottom:12}}>
                     <div className="card-title">📋 Partidos de la quiniela</div>
                     <div className="card-body">
-                      <p style={{fontSize:10,color:"var(--muted)",marginBottom:8}}>Selecciona los partidos que entran (todos los participantes los verán):</p>
+                      <p style={{fontSize:10,color:"var(--muted)",marginBottom:8}}>Selecciona los partidos que entran:</p>
                       <div className="match-selector">
                         {matches.map(m=>(
                           <div key={m.id} className={`match-selector-item ${quinielaMatches.includes(m.id)?"selected":""}`} onClick={()=>toggleQMatch(m.id)}>
@@ -1106,46 +1264,81 @@ export default function Mundial2026(){
                   </div>
                 )}
 
-                {/* Participante: sus pronósticos */}
                 {!isAdmin&&myId&&(
                   <div className="card">
-                    <div className="card-title">✏️ Mis Pronósticos</div>
+                    <div className="card-title" style={{justifyContent:"space-between"}}>
+                      <span>✏️ Mis Pronósticos</span>
+                      {quinielaMatches.length>0&&<button className="q-btn" style={{fontSize:11,padding:"5px 10px"}} onClick={()=>exportQuiniela(user,quinielaMatches,matches,myPreds,myData?.predictions?.podio||{})}>📥 Descargar</button>}
+                    </div>
                     <div className="card-body">
                       {quinielaMatches.length===0
-                        ?<div style={{color:"var(--muted)",fontSize:11,textAlign:"center",padding:20}}>El admin aún no ha seleccionado los partidos de la quiniela.</div>
-                        :<div className="pred-grid">
-                          {quinielaMatches.map(mid=>{
-                            const m=matches.find(x=>x.id===mid);
-                            if(!m)return null;
-                            const pred=myPreds[mid]||{};
-                            const pts=scoreQuiniela(pred,m);
-                            return(
-                              <div key={mid} className="pred-row">
-                                <div className="pred-teams">
-                                  <span style={{color:"var(--accent)",fontFamily:"'Bebas Neue'",marginRight:3}}>{m.group}</span>
-                                  {flag(m.home)} {short(m.home)} vs {short(m.away)} {flag(m.away)}
+                        ?<div style={{color:"var(--muted)",fontSize:11,textAlign:"center",padding:20}}>El admin aún no ha seleccionado los partidos.</div>
+                        :<>
+                          <div className="pred-grid">
+                            {quinielaMatches.map(mid=>{
+                              const m=matches.find(x=>x.id===mid);
+                              if(!m)return null;
+                              const pred=myPreds[mid]||{};
+                              const pts=scoreQuiniela(pred,m);
+                              const real=m.played?(m.homeScore>m.awayScore?"L":m.awayScore>m.homeScore?"V":"E"):null;
+                              return(
+                                <div key={mid} className="pred-row">
+                                  <div className="pred-teams">
+                                    <span style={{color:"var(--accent)",fontFamily:"'Bebas Neue'",marginRight:3}}>{m.group}</span>
+                                    {flag(m.home)} {short(m.home)} vs {short(m.away)} {flag(m.away)}
+                                  </div>
+                                  <div className="pred-inputs">
+                                    {["L","E","V"].map(opt=>{
+                                      const selected=pred.result===opt;
+                                      const isCorrect=m.played&&real===opt;
+                                      const isWrong=m.played&&selected&&real!==opt;
+                                      return(
+                                        <button key={opt} disabled={m.played}
+                                          onClick={()=>savePred(myId,mid,opt)}
+                                          style={{
+                                            width:32,height:28,borderRadius:5,border:"1px solid",
+                                            fontSize:11,fontWeight:700,cursor:m.played?"default":"pointer",
+                                            background:selected?(isWrong?"var(--accent2)":isCorrect?"var(--green)":"var(--accent)"):"var(--card)",
+                                            borderColor:selected?(isWrong?"var(--accent2)":isCorrect?"var(--green)":"var(--accent)"):"var(--border)",
+                                            color:selected?"#000":"var(--muted)",
+                                            transition:"all .15s"
+                                          }}>
+                                          {opt}
+                                        </button>
+                                      );
+                                    })}
+                                    {m.played&&pred.result&&<div className={`pred-badge ${pts===1?"exact":"wrong"}`}>{pts===1?"+1":"✗"}</div>}
+                                  </div>
                                 </div>
-                                <div className="pred-inputs">
-                                  <input className="pred-box" type="number" min="0" max="20"
-                                    value={pred.home??""} disabled={m.played}
-                                    onChange={e=>savePred(myId,mid,e.target.value,pred.away??"")}/>
-                                  <span style={{color:"var(--muted)",fontFamily:"'Bebas Neue'",fontSize:13}}>-</span>
-                                  <input className="pred-box" type="number" min="0" max="20"
-                                    value={pred.away??""} disabled={m.played}
-                                    onChange={e=>savePred(myId,mid,pred.home??"",e.target.value)}/>
-                                  {m.played&&<div className={`pred-badge ${pts===3?"exact":pts===1?"outcome":pts===0?"wrong":"pending"}`}>{pts===3?"+3":pts===1?"+1":pts===0?"✗":"–"}</div>}
+                              );
+                            })}
+                          </div>
+
+                          {/* PODIO */}
+                          <div style={{marginTop:14,padding:"10px 12px",background:"var(--card2)",borderRadius:8,border:"1px solid var(--border)"}}>
+                            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"var(--accent)",marginBottom:8,letterSpacing:1}}>🏆 PREDICCIÓN DE PODIO</div>
+                            {[{key:"champion",label:"🥇 Campeón"},{key:"runner",label:"🥈 Subcampeón"},{key:"third",label:"🥉 Tercer lugar"}].map(({key,label})=>{
+                              const allTeams=Object.values(GROUPS_DATA).flatMap(g=>g.teams);
+                              const current=myData?.predictions?.podio?.[key]||"";
+                              return(
+                                <div key={key} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                                  <span style={{fontSize:11,fontWeight:600,width:90,flexShrink:0}}>{label}</span>
+                                  <select value={current} onChange={e=>savePodio(myId,key,e.target.value)}
+                                    style={{flex:1,padding:"5px 8px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text)",fontSize:11,outline:"none"}}>
+                                    <option value="">— Selecciona —</option>
+                                    {allTeams.map(t=><option key={t} value={t}>{flag(t)} {t}</option>)}
+                                  </select>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        </>
                       }
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Derecha: ranking quiniela */}
               <div>
                 <div className="card">
                   <div className="card-title">🏅 Ranking Quiniela</div>
@@ -1158,14 +1351,14 @@ export default function Mundial2026(){
                             <div className={`rank-pos ${i===0?"gold":i===1?"silver":i===2?"bronze":""}`}>{i+1}</div>
                             <div className="rank-meta">
                               <div className="rank-name">{p.name}{myId&&p.id===myId&&<span style={{fontSize:9,color:"var(--accent)",marginLeft:5}}>← tú</span>}</div>
-                              <div className="rank-detail"><span>✅ {p.exact} exactos</span><span>🟡 {p.outcome} result.</span>{p.pending>0&&<span>⏳ {p.pending}</span>}</div>
+                              <div className="rank-detail"><span>✅ {p.correct} aciertos</span><span>❌ {p.wrong} fallos</span>{p.pending>0&&<span>⏳ {p.pending}</span>}</div>
                             </div>
                             <div className="rank-pts">{p.quiniela}</div>
                           </div>
                         ))}
                       </div>
                     }
-                    <div className="score-rules">🟢 Exacto = <strong style={{color:"var(--green)"}}>3 pts</strong> &nbsp;|&nbsp; 🟡 Resultado = <strong style={{color:"var(--accent)"}}>1 pt</strong></div>
+                    <div className="score-rules">✅ L/E/V correcto = <strong style={{color:"var(--green)"}}>1 pt</strong></div>
                   </div>
                 </div>
               </div>
