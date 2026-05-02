@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { PaniniSection, PANINI_TEAMS, PANINI_SPECIALS_COUNT } from "./Panini.jsx";
 import { db } from "./firebase";
 import { ref, onValue, set, update, get } from "firebase/database";
 
@@ -745,6 +746,7 @@ export default function Mundial2026(){
   const[selectedGroup,setSelectedGroup]=useState("A");
   const[matches,setMatches]=useState(INITIAL_MATCHES);
   const[ko,setKo]=useState({r32:{},r16:{},qf:{},sf:{},final:{}});
+  const[panini,setPanini]=useState({teams:{},specials:{}});
   const[participants,setParticipants]=useState({});
   const[jornadaStats,setJornadaStats]=useState({});
   const[quinielaMatches,setQuinielaMatches]=useState([]);
@@ -775,6 +777,8 @@ export default function Mundial2026(){
     unsubs.push(onValue(ref(db,"jornadaStats"),snap=>{if(snap.exists())setJornadaStats(snap.val());else setJornadaStats({});}));
     // quinielaMatches (global config set by admin)
     unsubs.push(onValue(ref(db,"quinielaMatches"),snap=>{if(snap.exists())setQuinielaMatches(snap.val()||[]);}));
+    // panini
+    unsubs.push(onValue(ref(db,"panini"),snap=>{if(snap.exists())setPanini(snap.val());else setPanini({teams:{},specials:{}});}));
     return()=>unsubs.forEach(u=>u());
   },[]);
 
@@ -848,6 +852,17 @@ export default function Mundial2026(){
   const myPreds=myData?.predictions||{};
   const myLineup=myData?.lineup||{};
   const myId=user&&!isAdmin?safeKey(user.name?.toLowerCase()):null;
+
+  // ── Panini handlers (code = FIFA code e.g. MEX, ENG)
+  const paniniToggle=async(code,idx,val)=>{
+    await set(ref(db,`panini/teams/${code}/${idx}`),val||null);
+  };
+  const paniniToggleSpecial=async(code,val)=>{
+    await update(ref(db,`panini/specials/${code}`),{owned:val});
+  };
+  const paniniSpecialLabel=async(code,label)=>{
+    await update(ref(db,`panini/specials/${code}`),{label});
+  };
 
   const roundLabels={r32:"Ronda de 32",r16:"Octavos",qf:"Cuartos",sf:"Semifinal",final:"Final"};
 
@@ -1053,6 +1068,7 @@ export default function Mundial2026(){
           <Tab label="🎯 Quiniela" active={activeTab==="quiniela"} onClick={()=>setActiveTab("quiniela")}/>
           <Tab label="⭐ 11 Ideal" active={activeTab==="once"} onClick={()=>setActiveTab("once")}/>
           {isAdmin&&<Tab label="📋 Jornada" active={activeTab==="jornada"} onClick={()=>setActiveTab("jornada")}/>}
+          <Tab label="📒 Panini" active={activeTab==="panini"} onClick={()=>setActiveTab("panini")}/>
           {isAdmin&&<Tab label="👥 Usuarios" active={activeTab==="usuarios"} onClick={()=>setActiveTab("usuarios")} badge={Object.keys(participants).length}/>}
         </div>
 
@@ -1477,6 +1493,20 @@ export default function Mundial2026(){
                 }
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── PANINI ── */}
+        {activeTab==="panini"&&(
+          <div>
+            <PaniniSection
+              panini={panini}
+              onToggle={paniniToggle}
+              onToggleSpecial={paniniToggleSpecial}
+              onSpecialLabel={paniniSpecialLabel}
+              isAdmin={isAdmin}
+              userId={myId}
+            />
           </div>
         )}
 
