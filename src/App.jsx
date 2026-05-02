@@ -1068,7 +1068,7 @@ export default function Mundial2026(){
           <div className="topbar-title">MUNDIAL <span>2026</span></div>
           <div className="topbar-user">
             {isAdmin?<div className="admin-badge">⚙️ ADMIN</div>:<div className="user-badge">👤 {user.name}</div>}
-            <button className="reload-btn" onClick={()=>window.location.reload()} title="Recargar">🔄</button>
+            <button className="reload-btn" onClick={()=>{setPanini({teams:{},specials:{}});setTimeout(()=>{const uid=isAdmin?"admin":safeKey((user?.name||"guest").toLowerCase());get(ref(db,`panini/${uid}`)).then(snap=>{if(snap.exists())setPanini(snap.val());});},100);}} title="Recargar">🔄</button>
             <button className="logout-btn" onClick={()=>{setUser(null);setActiveTab("inicio");}}>Salir</button>
           </div>
         </div>
