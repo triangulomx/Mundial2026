@@ -778,8 +778,8 @@ export default function Mundial2026(){
     unsubs.push(onValue(ref(db,"jornadaStats"),snap=>{if(snap.exists())setJornadaStats(snap.val());else setJornadaStats({});}));
     // quinielaMatches (global config set by admin)
     unsubs.push(onValue(ref(db,"quinielaMatches"),snap=>{if(snap.exists())setQuinielaMatches(snap.val()||[]);}));
-    // panini — per user
-    const paniniUserId = user.isAdmin ? "admin" : (user.id || safeKey(user.name?.toLowerCase()||"guest"));
+    // panini — per user (same key formula as writers)
+    const paniniUserId = user.isAdmin ? "admin" : safeKey((user.name||"guest").toLowerCase());
     unsubs.push(onValue(ref(db,`panini/${paniniUserId}`),snap=>{if(snap.exists())setPanini(snap.val());else setPanini({teams:{},specials:{}});}));
     return()=>unsubs.forEach(u=>u());
   },[user]);
@@ -856,7 +856,7 @@ export default function Mundial2026(){
   const myId=user&&!isAdmin?safeKey(user.name?.toLowerCase()):null;
 
   // ── Panini handlers (code = FIFA code e.g. MEX, ENG)
-  const paniniUid = isAdmin ? "admin" : (myId || "guest");
+  const paniniUid = isAdmin ? "admin" : safeKey((user?.name||"guest").toLowerCase());
   const paniniToggle=async(code,idx,val)=>{
     await set(ref(db,`panini/${paniniUid}/teams/${code}/${idx}`),val||null);
   };
