@@ -760,6 +760,7 @@ export default function Mundial2026(){
 
   // ── Load all data from Firebase
   useEffect(()=>{
+    if(!user)return;
     const unsubs=[];
     // matches
     unsubs.push(onValue(ref(db,"matches"),snap=>{
@@ -777,10 +778,11 @@ export default function Mundial2026(){
     unsubs.push(onValue(ref(db,"jornadaStats"),snap=>{if(snap.exists())setJornadaStats(snap.val());else setJornadaStats({});}));
     // quinielaMatches (global config set by admin)
     unsubs.push(onValue(ref(db,"quinielaMatches"),snap=>{if(snap.exists())setQuinielaMatches(snap.val()||[]);}));
-    // panini
-    unsubs.push(onValue(ref(db,"panini"),snap=>{if(snap.exists())setPanini(snap.val());else setPanini({teams:{},specials:{}});}));
+    // panini — per user
+    const paniniUserId = user.isAdmin ? "admin" : (user.id || safeKey(user.name?.toLowerCase()||"guest"));
+    unsubs.push(onValue(ref(db,`panini/${paniniUserId}`),snap=>{if(snap.exists())setPanini(snap.val());else setPanini({teams:{},specials:{}});}));
     return()=>unsubs.forEach(u=>u());
-  },[]);
+  },[user]);
 
   // ── Admin: update match score
   const saveMatch=async(id,homeScore,awayScore)=>{
@@ -854,17 +856,18 @@ export default function Mundial2026(){
   const myId=user&&!isAdmin?safeKey(user.name?.toLowerCase()):null;
 
   // ── Panini handlers (code = FIFA code e.g. MEX, ENG)
+  const paniniUid = isAdmin ? "admin" : (myId || "guest");
   const paniniToggle=async(code,idx,val)=>{
-    await set(ref(db,`panini/teams/${code}/${idx}`),val||null);
+    await set(ref(db,`panini/${paniniUid}/teams/${code}/${idx}`),val||null);
   };
   const paniniToggleSpecial=async(code,val)=>{
-    await update(ref(db,`panini/specials/${code}`),{owned:val});
+    await update(ref(db,`panini/${paniniUid}/specials/${code}`),{owned:val});
   };
   const paniniSpecialLabel=async(code,label)=>{
-    await update(ref(db,`panini/specials/${code}`),{label});
+    await update(ref(db,`panini/${paniniUid}/specials/${code}`),{label});
   };
   const paniniDup=async(code,idx,count)=>{
-    await set(ref(db,`panini/dups/${code}/${idx}`),count>0?count:null);
+    await set(ref(db,`panini/${paniniUid}/dups/${code}/${idx}`),count>0?count:null);
   };
 
   const roundLabels={r32:"Ronda de 32",r16:"Octavos",qf:"Cuartos",sf:"Semifinal",final:"Final"};
