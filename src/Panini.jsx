@@ -59,14 +59,14 @@ const PANINI_GROUPS = {
   L:["Inglaterra","Croacia","Panamá","Ghana"],
 };
 
-const SPECIALS_FCW = ["FCW00","FCW01","FCW02","FCW03","FCW04","FCW05","FCW06","FCW07","FCW08"];
+const SPECIALS_FCW = ["FWC01","FWC02","FWC03","FWC04","FWC05","FWC06","FWC07","FWC08","FWC09","FWC10","FWC11","FWC12","FWC13","FWC14","FWC15","FWC16","FWC17","FWC18","FWC19"];
 const SPECIALS_CC  = ["CC01","CC02","CC03","CC04","CC05","CC06","CC07","CC08","CC09","CC10","CC11","CC12","CC13","CC14"];
 const ALL_SPECIALS = [...SPECIALS_FCW,...SPECIALS_CC];
 
 const STICKERS_PER_TEAM = 20;
 const TOTAL_TEAM_STICKERS = 48 * STICKERS_PER_TEAM;
 const TOTAL_SPECIALS = ALL_SPECIALS.length; // 23
-const GRAND_TOTAL = TOTAL_TEAM_STICKERS + TOTAL_SPECIALS; // 983
+const GRAND_TOTAL = TOTAL_TEAM_STICKERS + TOTAL_SPECIALS; // 993
 
 function usePaniniStats(panini) {
   return useMemo(() => {
@@ -180,7 +180,7 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:"var(--blue)"}}>⭐ ESPECIALES</div>
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"var(--blue)"}}>{specialsOwned}/{TOTAL_SPECIALS}</div>
             </div>
-            <div style={{fontSize:10,color:"var(--muted)",marginBottom:6}}>FCW00–FCW08 · CC01–CC14</div>
+            <div style={{fontSize:10,color:"var(--muted)",marginBottom:6}}>FWC01–FWC19 · CC01–CC14</div>
             <div style={{height:4,background:"var(--border)",borderRadius:2,overflow:"hidden"}}>
               <div style={{height:"100%",background:"var(--blue)",width:`${(specialsOwned/TOTAL_SPECIALS)*100}%`}}/>
             </div>
@@ -221,15 +221,23 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
                 <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {section.list.map(code=>{
                     const s=panini?.specials?.[code]||{};
+                    const dups=s.dups||0;
                     return(
-                      <div key={code} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",background:s.owned?"rgba(16,185,129,0.08)":"var(--card2)",borderRadius:8,border:`1px solid ${s.owned?"var(--green)":"var(--border)"}`}}>
-                        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:section.color,width:48,flexShrink:0}}>{code}</div>
-                        <input value={s.label||""} onChange={e=>onSpecialLabel(code,e.target.value)} placeholder="Descripción..."
-                          style={{flex:1,padding:"3px 0",background:"transparent",border:"none",borderBottom:"1px solid var(--border)",color:"var(--text)",fontSize:12,outline:"none"}}/>
+                      <div key={code} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",background:s.owned?"rgba(16,185,129,0.08)":"var(--card2)",borderRadius:8,border:`1px solid ${s.owned?"var(--green)":"var(--border)"}`}}>
                         <button onClick={()=>handleSpecial(code)}
-                          style={{width:32,height:32,borderRadius:6,border:`1px solid ${s.owned?"var(--green)":"var(--border)"}`,background:s.owned?"var(--green)":"var(--card)",color:s.owned?"#000":"var(--muted)",cursor:"pointer",fontSize:14,fontWeight:700,transition:"all .15s"}}>
+                          style={{width:32,height:32,borderRadius:6,flexShrink:0,border:`1px solid ${s.owned?"var(--green)":"var(--border)"}`,background:s.owned?"var(--green)":"var(--card)",color:s.owned?"#000":"var(--muted)",cursor:"pointer",fontSize:14,fontWeight:700,transition:"all .15s"}}>
                           {s.owned?"✓":"○"}
                         </button>
+                        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:s.owned?"var(--text)":section.color,flex:1,letterSpacing:.5}}>{code}</div>
+                        {s.owned&&(
+                          <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                            <button onClick={()=>onDup("special_"+code,0,Math.max(0,dups-1))}
+                              style={{width:22,height:22,borderRadius:4,border:"1px solid var(--border)",background:"var(--card)",color:"var(--muted)",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                            <div style={{minWidth:20,textAlign:"center",fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:dups>0?"#8b5cf6":"var(--muted)"}}>{dups>0?dups:"·"}</div>
+                            <button onClick={()=>onDup("special_"+code,0,dups+1)}
+                              style={{width:22,height:22,borderRadius:4,border:"1px solid var(--border)",background:"var(--card)",color:"#8b5cf6",cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>＋</button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
