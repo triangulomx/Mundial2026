@@ -867,7 +867,12 @@ export default function Mundial2026(){
     await update(ref(db,`panini/${paniniUid}/specials/${code}`),{label});
   };
   const paniniDup=async(code,idx,count)=>{
-    await set(ref(db,`panini/${paniniUid}/dups/${code}/${idx}`),count>0?count:null);
+    if(code.startsWith("special_")){
+      const sCode=code.replace("special_","");
+      await update(ref(db,`panini/${paniniUid}/specials/${sCode}`),{dups:count>0?count:null});
+    } else {
+      await set(ref(db,`panini/${paniniUid}/dups/${code}/${idx}`),count>0?count:null);
+    }
   };
 
   const roundLabels={r32:"Ronda de 32",r16:"Octavos",qf:"Cuartos",sf:"Semifinal",final:"Final"};
