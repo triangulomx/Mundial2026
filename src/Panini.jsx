@@ -276,7 +276,7 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
                   <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"var(--accent)"}}>GRUPO {group}</div>
                   <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:pct===100?"var(--green)":"var(--text)"}}>{gs.owned}/{gs.total}</div>
                 </div>
-                <div style={{fontSize:10,color:"var(--muted)",marginBottom:6}}>{teams.map(t=>FIFA_CODE[t]).join("  ·  ")}</div>
+                <div style={{fontSize:16,marginBottom:6,letterSpacing:2}}>{teams.map(t=>flag(t)).join("  ")}</div>
                 <div style={{height:4,background:"var(--border)",borderRadius:2,overflow:"hidden"}}>
                   <div style={{height:"100%",background:pct===100?"var(--green)":"var(--accent)",width:`${pct}%`,transition:"width .5s"}}/>
                 </div>
