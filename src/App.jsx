@@ -914,6 +914,8 @@ export default function Mundial2026(){
     .admin-badge{padding:5px 12px;background:rgba(245,158,11,.2);border:1px solid var(--accent);border-radius:20px;font-size:11px;font-weight:700;color:var(--accent);}
     .logout-btn{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:11px;cursor:pointer;}
     .logout-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+    .reload-btn{width:30px;height:30px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+    .reload-btn:hover{border-color:var(--accent);transform:rotate(180deg);}
 
     /* TABS */
     .tabs{display:flex;gap:3px;margin-bottom:20px;flex-wrap:wrap;}
@@ -1066,6 +1068,7 @@ export default function Mundial2026(){
           <div className="topbar-title">MUNDIAL <span>2026</span></div>
           <div className="topbar-user">
             {isAdmin?<div className="admin-badge">⚙️ ADMIN</div>:<div className="user-badge">👤 {user.name}</div>}
+            <button className="reload-btn" onClick={()=>window.location.reload()} title="Recargar">🔄</button>
             <button className="logout-btn" onClick={()=>{setUser(null);setActiveTab("inicio");}}>Salir</button>
           </div>
         </div>
