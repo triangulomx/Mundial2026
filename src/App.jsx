@@ -863,6 +863,9 @@ export default function Mundial2026(){
   const paniniSpecialLabel=async(code,label)=>{
     await update(ref(db,`panini/specials/${code}`),{label});
   };
+  const paniniDup=async(code,idx,count)=>{
+    await set(ref(db,`panini/dups/${code}/${idx}`),count>0?count:null);
+  };
 
   const roundLabels={r32:"Ronda de 32",r16:"Octavos",qf:"Cuartos",sf:"Semifinal",final:"Final"};
 
@@ -1504,6 +1507,7 @@ export default function Mundial2026(){
               onToggle={paniniToggle}
               onToggleSpecial={paniniToggleSpecial}
               onSpecialLabel={paniniSpecialLabel}
+              onDup={paniniDup}
               isAdmin={isAdmin}
               userId={myId}
             />
