@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { PaniniSection, PANINI_TEAMS, PANINI_SPECIALS_COUNT } from "./Panini.jsx";
+import { PaniniSection, PANINI_GROUPS, GRAND_TOTAL, TOTAL_SPECIALS, FIFA_CODE, paniniFlag } from "./Panini.jsx";
 import { db } from "./firebase";
 import { ref, onValue, set, update, get } from "firebase/database";
 
@@ -875,6 +875,28 @@ export default function Mundial2026(){
     }
   };
 
+  // ── Panini stats for home screen
+  const paniniHomeStats = useMemo(() => {
+    let owned = 0;
+    const teamScores = [];
+    Object.entries(PANINI_GROUPS).forEach(([group, teams]) => {
+      teams.forEach(team => {
+        const code = FIFA_CODE[team];
+        let t = 0;
+        for (let i = 0; i < 20; i++) if (panini?.teams?.[code]?.[i]) { t++; owned++; }
+        teamScores.push({ team, code, group, owned: t, total: 20, pct: (t/20)*100 });
+      });
+    });
+    // specials
+    let specOwned = 0;
+    const allSpecials = [...Array.from({length:19},(_,i)=>`FWC${String(i+1).padStart(2,"0")}`), ...Array.from({length:14},(_,i)=>`CC${String(i+1).padStart(2,"0")}`)];
+    allSpecials.forEach(c => { if (panini?.specials?.[c]?.owned) specOwned++; });
+    const totalOwned = owned + specOwned;
+    const pct = Math.round((totalOwned / 993) * 100);
+    const top = [...teamScores].sort((a,b) => b.pct - a.pct).slice(0, 5);
+    return { totalOwned, pct, top, teamScores };
+  }, [panini]);
+
   const roundLabels={r32:"Ronda de 32",r16:"Octavos",qf:"Cuartos",sf:"Semifinal",final:"Final"};
 
   if(!user)return<LoginScreen onLogin={u=>{setUser(u);if(u.isAdmin)setActiveTab("inicio");else setActiveTab("inicio");}}/>;
@@ -1156,6 +1178,67 @@ export default function Mundial2026(){
             </div>
             <div style={{textAlign:"center",marginTop:8,fontSize:10,color:"var(--muted)"}}>
               Grupos A–D · <button onClick={()=>setActiveTab("grupos")} style={{background:"none",border:"none",color:"var(--accent)",cursor:"pointer",fontSize:10,fontWeight:700}}>Ver todos →</button>
+            </div>
+
+            {/* PANINI WIDGET */}
+            <div className="card" style={{marginTop:16}}>
+              <div className="card-title">
+                <span>📒 Mi Panini</span>
+                <button onClick={()=>setActiveTab("panini")} style={{padding:"4px 12px",background:"var(--accent)",border:"none",borderRadius:6,color:"#000",fontSize:11,fontWeight:700,cursor:"pointer"}}>Ver todo →</button>
+              </div>
+              <div className="card-body">
+                {/* Big % */}
+                <div style={{display:"flex",alignItems:"center",gap:20,marginBottom:16}}>
+                  <div style={{position:"relative",width:90,height:90,flexShrink:0}}>
+                    <svg viewBox="0 0 90 90" style={{transform:"rotate(-90deg)"}}>
+                      <circle cx="45" cy="45" r="38" fill="none" stroke="var(--border)" strokeWidth="8"/>
+                      <circle cx="45" cy="45" r="38" fill="none" stroke="var(--accent)" strokeWidth="8"
+                        strokeDasharray={`${2*Math.PI*38}`}
+                        strokeDashoffset={`${2*Math.PI*38*(1-paniniHomeStats.pct/100)}`}
+                        strokeLinecap="round" style={{transition:"stroke-dashoffset .8s"}}/>
+                    </svg>
+                    <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"var(--accent)",lineHeight:1}}>{paniniHomeStats.pct}%</div>
+                      <div style={{fontSize:9,color:"var(--muted)"}}>completado</div>
+                    </div>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:28,color:"var(--text)",lineHeight:1}}>{paniniHomeStats.totalOwned}<span style={{fontSize:14,color:"var(--muted)"}}>/993</span></div>
+                    <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>estampas obtenidas</div>
+                    <div style={{height:4,background:"var(--border)",borderRadius:2,marginTop:8,overflow:"hidden"}}>
+                      <div style={{height:"100%",background:"var(--accent)",borderRadius:2,width:`${paniniHomeStats.pct}%`,transition:"width .8s"}}/>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Top teams */}
+                {paniniHomeStats.top.some(t=>t.owned>0)&&(
+                  <div>
+                    <div style={{fontSize:10,color:"var(--muted)",letterSpacing:2,textTransform:"uppercase",marginBottom:8}}>🏆 Selecciones más completas</div>
+                    <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                      {paniniHomeStats.top.filter(t=>t.owned>0).map((t,i)=>(
+                        <div key={t.code} onClick={()=>setActiveTab("panini")}
+                          style={{display:"flex",alignItems:"center",gap:10,padding:"7px 10px",background:"var(--card2)",borderRadius:8,border:"1px solid var(--border)",cursor:"pointer"}}
+                          onMouseEnter={e=>e.currentTarget.style.borderColor="var(--accent)"}
+                          onMouseLeave={e=>e.currentTarget.style.borderColor="var(--border)"}>
+                          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"var(--muted)",width:20}}>{i+1}</div>
+                          <div style={{fontSize:22}}>{paniniFlag(t.team)}</div>
+                          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"var(--accent)",width:36}}>{t.code}</div>
+                          <div style={{flex:1}}>
+                            <div style={{height:4,background:"var(--border)",borderRadius:2,overflow:"hidden"}}>
+                              <div style={{height:"100%",background:t.pct===100?"var(--green)":"var(--accent)",borderRadius:2,width:`${t.pct}%`,transition:"width .6s"}}/>
+                            </div>
+                          </div>
+                          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color:t.pct===100?"var(--green)":"var(--text)",minWidth:40,textAlign:"right"}}>{t.owned}<span style={{fontSize:11,color:"var(--muted)"}}>/20</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {paniniHomeStats.totalOwned===0&&(
+                  <div style={{textAlign:"center",padding:16,color:"var(--muted)",fontSize:12}}>Aún no tienes estampas registradas. <button onClick={()=>setActiveTab("panini")} style={{background:"none",border:"none",color:"var(--accent)",cursor:"pointer",fontWeight:700}}>¡Ve al Panini!</button></div>
+                )}
+              </div>
             </div>
           </div>
         )}
