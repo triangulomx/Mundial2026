@@ -318,8 +318,7 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
                       lines.push("");
                     });
                     lines.push(`Total: ${allDupsList.reduce((a,d)=>a+d.dups,0)} estampas`);
-                    navigator.clipboard.writeText(lines.join("
-")).then(()=>alert("¡Copiado al portapapeles!")).catch(()=>alert("No se pudo copiar"));
+                    navigator.clipboard.writeText(lines.join("\n")).then(()=>alert("¡Copiado al portapapeles!")).catch(()=>alert("No se pudo copiar"));
                   }} style={{flex:1,padding:"9px 0",background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                     📋 Copiar texto
                   </button>
