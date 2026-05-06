@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { PaniniSection, PANINI_GROUPS, GRAND_TOTAL, TOTAL_SPECIALS, FIFA_CODE, paniniFlag } from "./Panini.jsx";
+import { PaniniSection, PANINI_GROUPS, GRAND_TOTAL, FIFA_CODE, paniniFlag } from "./Panini.jsx";
 import { db } from "./firebase";
 import { ref, onValue, set, update, get } from "firebase/database";
 
