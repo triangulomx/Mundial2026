@@ -94,6 +94,101 @@ function usePaniniStats(panini) {
   }, [panini]);
 }
 
+// ─── EXPORT DUPS AS IMAGE ────────────────────────────────────────────────────
+async function exportDupsImage(dupsList) {
+  const byTeam = {};
+  dupsList.forEach(d => {
+    if (!byTeam[d.team]) byTeam[d.team] = { group: d.group, items: [] };
+    byTeam[d.team].items.push(d);
+  });
+  const teams = Object.entries(byTeam);
+  const totalDups = dupsList.reduce((a, d) => a + d.dups, 0);
+  const date = new Date().toLocaleDateString("es-MX", { day:"numeric", month:"long", year:"numeric" });
+
+  const COLS = 4;
+  const ITEM_H = 28;
+  const TEAM_PAD = 14;
+  const TEAM_HEADER = 26;
+  const W = 700;
+  const PAD = 24;
+
+  // Estimate height
+  let contentH = 0;
+  teams.forEach(([, {items}]) => { contentH += TEAM_HEADER + Math.ceil(items.length / COLS) * ITEM_H + TEAM_PAD; });
+  const HEADER_H = 80;
+  const FOOTER_H = 50;
+  const H = HEADER_H + contentH + FOOTER_H + PAD;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  // BG
+  ctx.fillStyle = "#080d18"; ctx.fillRect(0, 0, W, H);
+
+  // Top bar
+  const bar = ctx.createLinearGradient(0,0,W,0);
+  bar.addColorStop(0,"transparent"); bar.addColorStop(0.5,"#8b5cf6"); bar.addColorStop(1,"transparent");
+  ctx.fillStyle = bar; ctx.fillRect(0, 0, W, 3);
+
+  // Header
+  ctx.fillStyle = "#162030"; ctx.fillRect(0, 3, W, HEADER_H - 3);
+  ctx.strokeStyle = "#1c2d42"; ctx.lineWidth = 1; ctx.strokeRect(0, 3, W, HEADER_H - 3);
+  ctx.font = "bold 13px Arial"; ctx.fillStyle = "#8b5cf6"; ctx.textAlign = "left";
+  ctx.fillText("PANINI MUNDIAL 2026  ·  MIS REPETIDAS", PAD, 36);
+  ctx.font = "bold 32px Arial Black"; ctx.fillStyle = "#fff";
+  ctx.fillText(`${totalDups} estampas para intercambio`, PAD, 68);
+
+  // Content
+  let y = HEADER_H + 10;
+  teams.forEach(([team, { group, items }]) => {
+    // Team header
+    ctx.fillStyle = "#162030"; ctx.fillRect(PAD, y, W - PAD*2, TEAM_HEADER);
+    ctx.strokeStyle = "#1c2d42"; ctx.lineWidth = 1; ctx.strokeRect(PAD, y, W - PAD*2, TEAM_HEADER);
+    ctx.font = "bold 13px Arial"; ctx.fillStyle = "#f59e0b"; ctx.textAlign = "left";
+    const label = group === "ESP" ? "⭐ Especiales" : team;
+    ctx.fillText(label, PAD + 10, y + 17);
+    y += TEAM_HEADER + 4;
+
+    // Sticker chips in columns
+    const colW = (W - PAD*2) / COLS;
+    items.forEach((item, idx) => {
+      const col = idx % COLS;
+      const row = Math.floor(idx / COLS);
+      const x = PAD + col * colW;
+      const cy = y + row * ITEM_H;
+
+      // Chip bg
+      ctx.fillStyle = "rgba(139,92,246,0.12)";
+      ctx.beginPath(); ctx.roundRect(x + 3, cy + 3, colW - 8, ITEM_H - 6, 6); ctx.fill();
+      ctx.strokeStyle = "rgba(139,92,246,0.4)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(x + 3, cy + 3, colW - 8, ITEM_H - 6, 6); ctx.stroke();
+
+      // Code + count
+      ctx.font = "bold 13px Arial"; ctx.fillStyle = "#a78bfa"; ctx.textAlign = "left";
+      ctx.fillText(item.code, x + 12, cy + 18);
+      ctx.font = "bold 13px Arial"; ctx.fillStyle = "#fff"; ctx.textAlign = "right";
+      ctx.fillText(`×${item.dups}`, x + colW - 12, cy + 18);
+    });
+
+    y += Math.ceil(items.length / COLS) * ITEM_H + TEAM_PAD;
+  });
+
+  // Footer
+  ctx.fillStyle = "#162030"; ctx.fillRect(0, H - FOOTER_H, W, FOOTER_H);
+  ctx.fillStyle = "#1c2d42"; ctx.fillRect(0, H - FOOTER_H, W, 1);
+  ctx.font = "11px Arial"; ctx.fillStyle = "#64748b"; ctx.textAlign = "left";
+  ctx.fillText(`Generado: ${date}`, PAD, H - 18);
+  ctx.font = "bold 11px Arial"; ctx.fillStyle = "#8b5cf6"; ctx.textAlign = "right";
+  ctx.fillText("⚽ Panini Mundial 2026", W - PAD, H - 18);
+  ctx.fillStyle = bar; ctx.fillRect(0, H - 3, W, 3);
+
+  const link = document.createElement("a");
+  link.download = "repetidas-panini-mundial2026.jpg";
+  link.href = canvas.toDataURL("image/jpeg", 0.93);
+  link.click();
+}
+
 function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDup }) {
   const [selGroup, setSelGroup] = useState(null);
   const [selTeam,  setSelTeam]  = useState(null);
@@ -204,10 +299,36 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
                 })()
               }
             </div>
-            {/* Footer total */}
-            <div style={{padding:"12px 20px",borderTop:"1px solid var(--border)",background:"var(--card2)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:12,color:"var(--muted)"}}>Total repetidas para intercambio</span>
-              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#8b5cf6"}}>{allDupsList.reduce((a,d)=>a+d.dups,0)}</span>
+            {/* Footer total + export buttons */}
+            <div style={{padding:"12px 20px",borderTop:"1px solid var(--border)",background:"var(--card2)",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"var(--muted)"}}>Total para intercambio</span>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#8b5cf6"}}>{allDupsList.reduce((a,d)=>a+d.dups,0)}</span>
+              </div>
+              {allDupsList.length>0&&(
+                <div style={{display:"flex",gap:8}}>
+                  {/* Copy as text */}
+                  <button onClick={()=>{
+                    const lines=["🔁 MIS REPETIDAS PANINI MUNDIAL 2026",""];
+                    const byTeam={};
+                    allDupsList.forEach(d=>{const k=d.team;if(!byTeam[k])byTeam[k]=[];byTeam[k].push(d);});
+                    Object.entries(byTeam).forEach(([team,items])=>{
+                      lines.push(team==="Especiales"?"⭐ Especiales":`${team} (${items[0].code?.slice(0,3)||""})`);
+                      items.forEach(i=>lines.push(`  ${i.code} ×${i.dups}`));
+                      lines.push("");
+                    });
+                    lines.push(`Total: ${allDupsList.reduce((a,d)=>a+d.dups,0)} estampas`);
+                    navigator.clipboard.writeText(lines.join("
+")).then(()=>alert("¡Copiado al portapapeles!")).catch(()=>alert("No se pudo copiar"));
+                  }} style={{flex:1,padding:"9px 0",background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                    📋 Copiar texto
+                  </button>
+                  {/* Export as image */}
+                  <button onClick={()=>exportDupsImage(allDupsList)} style={{flex:1,padding:"9px 0",background:"#8b5cf6",border:"none",borderRadius:8,color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                    📥 Exportar imagen
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -479,4 +600,4 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
   );
 }
 
-export { PaniniSection, PANINI_GROUPS, GRAND_TOTAL, TOTAL_SPECIALS };
+export { PaniniSection, PANINI_GROUPS, GRAND_TOTAL, TOTAL_SPECIALS, FIFA_CODE, flag as paniniFlag };
