@@ -360,13 +360,48 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
         const code=FIFA_CODE[selTeam];
         const stickers=buildStickers(selTeam);
         const ts=teamStats[code]||{owned:0};
+
+        // Navigation: flat list of all teams in order
+        const allTeams=Object.entries(PANINI_GROUPS).flatMap(([g,teams])=>teams.map(t=>({team:t,group:g})));
+        const curIdx=allTeams.findIndex(x=>x.team===selTeam);
+        const prevTeam=curIdx>0?allTeams[curIdx-1]:null;
+        const nextTeam=curIdx<allTeams.length-1?allTeams[curIdx+1]:null;
+        // Also compute prev/next group
+        const groupKeys=Object.keys(PANINI_GROUPS);
+        const curGroupIdx=groupKeys.indexOf(selGroup);
+        const prevGroup=curGroupIdx>0?groupKeys[curGroupIdx-1]:null;
+        const nextGroup=curGroupIdx<groupKeys.length-1?groupKeys[curGroupIdx+1]:null;
+
         return(
           <div className="card">
-            <div className="card-title">
-              <span>{flag(selTeam)} <span style={{color:"var(--accent)"}}>{code}</span> · {selTeam}</span>
-              <div style={{display:"flex",gap:12,alignItems:"center"}}>
+            <div style={{background:"var(--card2)",borderBottom:"1px solid var(--border)",padding:"10px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,letterSpacing:1}}>{flag(selTeam)} <span style={{color:"var(--accent)"}}>{code}</span> · {selTeam}</span>
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                {(teamDups[code]||0)>0&&<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:15,color:"#8b5cf6"}}>🔁 {teamDups[code]} rep.</span>}
                 <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"var(--accent)"}}>{ts.owned}/20</span>
-                {(teamDups[code]||0)>0&&<span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:16,color:"#8b5cf6"}}>🔁 {teamDups[code]} rep.</span>}
+              </div>
+            </div>
+            {/* NAV BUTTONS */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 14px",background:"var(--card2)",borderBottom:"1px solid var(--border)",gap:8,flexWrap:"wrap"}}>
+              <div style={{display:"flex",gap:6}}>
+                {prevGroup&&<button onClick={()=>{setSelTeam(null);setSelGroup(prevGroup);}}
+                  style={{padding:"5px 12px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:7,color:"var(--muted)",cursor:"pointer",fontSize:11,fontWeight:600}}>
+                  ← Grupo {prevGroup}
+                </button>}
+                {prevTeam&&<button onClick={()=>{setSelTeam(prevTeam.team);setSelGroup(prevTeam.group);}}
+                  style={{padding:"5px 12px",background:"var(--card)",border:"1px solid var(--accent)",borderRadius:7,color:"var(--accent)",cursor:"pointer",fontSize:11,fontWeight:600}}>
+                  ← {FIFA_CODE[prevTeam.team]}
+                </button>}
+              </div>
+              <div style={{display:"flex",gap:6}}>
+                {nextTeam&&<button onClick={()=>{setSelTeam(nextTeam.team);setSelGroup(nextTeam.group);}}
+                  style={{padding:"5px 12px",background:"var(--card)",border:"1px solid var(--accent)",borderRadius:7,color:"var(--accent)",cursor:"pointer",fontSize:11,fontWeight:600}}>
+                  {FIFA_CODE[nextTeam.team]} →
+                </button>}
+                {nextGroup&&<button onClick={()=>{setSelTeam(null);setSelGroup(nextGroup);}}
+                  style={{padding:"5px 12px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:7,color:"var(--muted)",cursor:"pointer",fontSize:11,fontWeight:600}}>
+                  Grupo {nextGroup} →
+                </button>}
               </div>
             </div>
             <div className="card-body">
@@ -409,13 +444,13 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
                         background:owned?"var(--green)":special?"rgba(245,158,11,.1)":"var(--card)",
                         border:`1px solid ${owned?"var(--green)":special?typeColor(s.type):"var(--border)"}`,
                         display:"flex",alignItems:"center",justifyContent:"center",
-                        fontFamily:"'Bebas Neue',sans-serif",fontSize:12,
+                        fontFamily:"'Bebas Neue',sans-serif",fontSize:15,
                         color:owned?"#000":special?typeColor(s.type):"var(--muted)"}}>
                         {owned?"✓":s.num}
                       </div>
                       <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>handleSticker(code,idx)}>
-                        <div style={{fontSize:10,fontWeight:700,color:"var(--accent)",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:.5}}>{s.code}</div>
-                        {special&&<div style={{fontSize:9,color:typeColor(s.type),letterSpacing:1,fontWeight:700,textTransform:"uppercase"}}>{s.type==="shield"?"Escudo":"Foto Equipo"}</div>}
+                        <div style={{fontSize:14,fontWeight:700,color:"var(--accent)",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:1}}>{s.code}</div>
+                        {special&&<div style={{fontSize:10,color:typeColor(s.type),letterSpacing:1,fontWeight:700,textTransform:"uppercase"}}>{s.type==="shield"?"Escudo":"Foto Equipo"}</div>}
                       </div>
                       {/* Duplicates counter — only shown when sticker is owned */}
                       {owned&&(()=>{
