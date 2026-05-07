@@ -189,12 +189,111 @@ async function exportDupsImage(dupsList) {
   link.click();
 }
 
+// ─── EXPORT MISSING AS IMAGE ─────────────────────────────────────────────────
+async function exportMissingImage(missingList) {
+  const byTeam = {};
+  missingList.forEach(d => {
+    if (!byTeam[d.team]) byTeam[d.team] = { group: d.group, items: [] };
+    byTeam[d.team].items.push(d);
+  });
+  const teams = Object.entries(byTeam);
+  const totalMissing = missingList.length;
+  const date = new Date().toLocaleDateString("es-MX", { day:"numeric", month:"long", year:"numeric" });
+
+  const COLS = 5;
+  const ITEM_H = 26;
+  const TEAM_PAD = 12;
+  const TEAM_HEADER = 26;
+  const W = 700;
+  const PAD = 24;
+
+  let contentH = 0;
+  teams.forEach(([, {items}]) => { contentH += TEAM_HEADER + Math.ceil(items.length / COLS) * ITEM_H + TEAM_PAD; });
+  const HEADER_H = 80;
+  const FOOTER_H = 50;
+  const H = HEADER_H + contentH + FOOTER_H + PAD;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#080d18"; ctx.fillRect(0, 0, W, H);
+
+  const bar = ctx.createLinearGradient(0,0,W,0);
+  bar.addColorStop(0,"transparent"); bar.addColorStop(0.5,"#ef4444"); bar.addColorStop(1,"transparent");
+  ctx.fillStyle = bar; ctx.fillRect(0, 0, W, 3);
+
+  ctx.fillStyle = "#162030"; ctx.fillRect(0, 3, W, HEADER_H - 3);
+  ctx.strokeStyle = "#1c2d42"; ctx.lineWidth = 1; ctx.strokeRect(0, 3, W, HEADER_H - 3);
+  ctx.font = "bold 13px Arial"; ctx.fillStyle = "#ef4444"; ctx.textAlign = "left";
+  ctx.fillText("PANINI MUNDIAL 2026  ·  MIS FALTANTES", PAD, 36);
+  ctx.font = "bold 32px Arial Black"; ctx.fillStyle = "#fff";
+  ctx.fillText(`${totalMissing} estampas que necesito`, PAD, 68);
+
+  let y = HEADER_H + 10;
+  teams.forEach(([team, { group, items }]) => {
+    ctx.fillStyle = "#162030"; ctx.fillRect(PAD, y, W - PAD*2, TEAM_HEADER);
+    ctx.strokeStyle = "#1c2d42"; ctx.lineWidth = 1; ctx.strokeRect(PAD, y, W - PAD*2, TEAM_HEADER);
+    ctx.font = "bold 13px Arial"; ctx.fillStyle = "#f59e0b"; ctx.textAlign = "left";
+    ctx.fillText(group === "ESP" ? "⭐ Especiales" : team, PAD + 10, y + 17);
+    y += TEAM_HEADER + 4;
+
+    const colW = (W - PAD*2) / COLS;
+    items.forEach((item, idx) => {
+      const col = idx % COLS;
+      const row = Math.floor(idx / COLS);
+      const x = PAD + col * colW;
+      const cy = y + row * ITEM_H;
+
+      ctx.fillStyle = "rgba(239,68,68,0.1)";
+      ctx.beginPath(); ctx.roundRect(x + 2, cy + 2, colW - 6, ITEM_H - 5, 5); ctx.fill();
+      ctx.strokeStyle = "rgba(239,68,68,0.35)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(x + 2, cy + 2, colW - 6, ITEM_H - 5, 5); ctx.stroke();
+      ctx.font = "bold 12px Arial"; ctx.fillStyle = "#fca5a5"; ctx.textAlign = "center";
+      ctx.fillText(item.code, x + colW/2, cy + 16);
+    });
+    y += Math.ceil(items.length / COLS) * ITEM_H + TEAM_PAD;
+  });
+
+  ctx.fillStyle = "#162030"; ctx.fillRect(0, H - FOOTER_H, W, FOOTER_H);
+  ctx.fillStyle = "#1c2d42"; ctx.fillRect(0, H - FOOTER_H, W, 1);
+  ctx.font = "11px Arial"; ctx.fillStyle = "#64748b"; ctx.textAlign = "left";
+  ctx.fillText(`Generado: ${date}`, PAD, H - 18);
+  ctx.font = "bold 11px Arial"; ctx.fillStyle = "#ef4444"; ctx.textAlign = "right";
+  ctx.fillText("⚽ Panini Mundial 2026", W - PAD, H - 18);
+  ctx.fillStyle = bar; ctx.fillRect(0, H - 3, W, 3);
+
+  const link = document.createElement("a");
+  link.download = "faltantes-panini-mundial2026.jpg";
+  link.href = canvas.toDataURL("image/jpeg", 0.93);
+  link.click();
+}
+
 function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDup }) {
   const [selGroup, setSelGroup] = useState(null);
   const [selTeam,  setSelTeam]  = useState(null);
   const [confirm,  setConfirm]  = useState(null);
   const [showDupsModal, setShowDupsModal] = useState(false);
+  const [showMissingModal, setShowMissingModal] = useState(false);
   const { groupStats, teamStats, teamDups, totalTeams, totalDups, specialsOwned } = usePaniniStats(panini);
+
+  // Build full missing list
+  const allMissingList = useMemo(() => {
+    const list = [];
+    Object.entries(PANINI_GROUPS).forEach(([group, teams]) => {
+      teams.forEach(team => {
+        const code = FIFA_CODE[team];
+        const stickers = buildStickers(team);
+        stickers.forEach((s, i) => {
+          if (!panini?.teams?.[code]?.[i]) list.push({ code: s.code, group, team });
+        });
+      });
+    });
+    // Specials
+    const allSpecials = [...Array.from({length:19},(_,i)=>`FWC${String(i+1).padStart(2,"0")}`), ...Array.from({length:14},(_,i)=>`CC${String(i+1).padStart(2,"0")}`)];
+    allSpecials.forEach(scode => { if (!panini?.specials?.[scode]?.owned) list.push({ code: scode, group:"ESP", team:"Especiales" }); });
+    return list;
+  }, [panini]);
 
   // Build full duplicates list for modal
   const allDupsList = useMemo(() => {
@@ -333,6 +432,69 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
         </div>
       )}
 
+      {/* MISSING MODAL */}
+      {showMissingModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:16}} onClick={()=>setShowMissingModal(false)}>
+          <div style={{background:"var(--card)",border:"1px solid #ef4444",borderRadius:16,width:"100%",maxWidth:520,maxHeight:"80vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--card2)"}}>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#ef4444",letterSpacing:1}}>🔍 MIS FALTANTES ({allMissingList.length})</div>
+              <button onClick={()=>setShowMissingModal(false)} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
+            </div>
+            <div style={{overflowY:"auto",padding:"16px 20px",flex:1}}>
+              {(()=>{
+                const byTeam={};
+                allMissingList.forEach(d=>{
+                  if(!byTeam[d.team])byTeam[d.team]={group:d.group,items:[]};
+                  byTeam[d.team].items.push(d);
+                });
+                return Object.entries(byTeam).map(([team,{group,items}])=>(
+                  <div key={team} style={{marginBottom:14}}>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"var(--accent)",marginBottom:6,letterSpacing:1}}>
+                      {group!=="ESP"?<>{flag(team)} {FIFA_CODE[team]} · <span style={{color:"var(--muted)",fontSize:11}}>{team}</span></>:<>⭐ Especiales</>}
+                      <span style={{color:"var(--muted)",fontSize:11,marginLeft:8,fontFamily:"sans-serif"}}>({items.length} faltantes)</span>
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                      {items.map(item=>(
+                        <span key={item.code} style={{padding:"3px 9px",borderRadius:6,background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",fontSize:11,fontWeight:700,color:"#fca5a5",fontFamily:"'Bebas Neue',sans-serif",letterSpacing:.5}}>
+                          {item.code}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+            <div style={{padding:"12px 20px",borderTop:"1px solid var(--border)",background:"var(--card2)",display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"var(--muted)"}}>Total estampas que necesito</span>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#ef4444"}}>{allMissingList.length}</span>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{
+                  const lines=["🔍 MIS FALTANTES PANINI MUNDIAL 2026",""];
+                  const byTeam={};
+                  allMissingList.forEach(d=>{if(!byTeam[d.team])byTeam[d.team]=[];byTeam[d.team].push(d.code);});
+                  Object.entries(byTeam).forEach(([team,codes])=>{
+                    lines.push(team==="Especiales"?"⭐ Especiales":`${team}`);
+                    lines.push(`  ${codes.join(", ")}`);
+                    lines.push("");
+                  });
+                  lines.push(`Total: ${allMissingList.length} estampas`);
+                  navigator.clipboard.writeText(lines.join("
+")).then(()=>alert("¡Copiado!")).catch(()=>alert("No se pudo copiar"));
+                }} style={{flex:1,padding:"9px 0",background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  📋 Copiar texto
+                </button>
+                <button onClick={()=>exportMissingImage(allMissingList)}
+                  style={{flex:1,padding:"9px 0",background:"#ef4444",border:"none",borderRadius:8,color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  📥 Exportar imagen
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* STATS */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:16}}>
         {[
@@ -340,9 +502,10 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
           {label:"Equipos",val:totalTeams,total:TOTAL_TEAM_STICKERS,color:"var(--green)"},
           {label:"Especiales",val:specialsOwned,total:TOTAL_SPECIALS,color:"var(--blue)"},
           {label:"Repetidas",val:totalDups,total:null,color:"#8b5cf6"},
+          {label:"Faltantes",val:allMissingList.length,total:null,color:"#ef4444"},
         ].map(s=>(
           <div key={s.label}
-            onClick={s.total===null&&s.val>0?()=>setShowDupsModal(true):undefined}
+            onClick={s.total===null&&s.val>0?(s.label==="Faltantes"?()=>setShowMissingModal(true):()=>setShowDupsModal(true)):undefined}
             style={{background:"var(--card)",border:`1px solid ${s.total===null&&s.val>0?"#8b5cf6":"var(--border)"}`,borderRadius:10,padding:"12px 14px",cursor:s.total===null&&s.val>0?"pointer":"default",transition:"border-color .2s"}}>
             <div style={{fontSize:9,color:"var(--muted)",letterSpacing:2,textTransform:"uppercase",marginBottom:4}}>
               {s.label}{s.total===null&&s.val>0&&<span style={{marginLeft:6,fontSize:9,color:"#8b5cf6"}}>VER →</span>}
