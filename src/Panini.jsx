@@ -275,6 +275,11 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
   const [confirm,  setConfirm]  = useState(null);
   const [showDupsModal, setShowDupsModal] = useState(false);
   const [showMissingModal, setShowMissingModal] = useState(false);
+  const [filterTeams, setFilterTeams] = useState([]); // shared filter for both modals
+
+  const allTeamsList = useMemo(()=>Object.entries(PANINI_GROUPS).flatMap(([g,teams])=>teams.map(t=>({team:t,code:FIFA_CODE[t],group:g}))),[]);
+  const toggleFilter = (code) => setFilterTeams(prev => prev.includes(code) ? prev.filter(x=>x!==code) : [...prev,code]);
+  const clearFilter = () => setFilterTeams([]);
   const { groupStats, teamStats, teamDups, totalTeams, totalDups, specialsOwned } = usePaniniStats(panini);
 
   // Build full missing list
@@ -365,19 +370,37 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#8b5cf6",letterSpacing:1}}>🔁 MIS REPETIDAS ({allDupsList.length} estampas)</div>
               <button onClick={()=>setShowDupsModal(false)} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
             </div>
+            {/* Team Filter */}
+                {/* TEAM FILTER */}
+                <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",background:"rgba(0,0,0,.2)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:10,color:"var(--muted)",letterSpacing:2,textTransform:"uppercase",flex:1}}>Filtrar por selección</span>
+                    {filterTeams.length>0&&<button onClick={clearFilter} style={{fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:5,color:"var(--muted)",cursor:"pointer"}}>Limpiar</button>}
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5,maxHeight:90,overflowY:"auto"}}>
+                    {allTeamsList.map(t=>{
+                      const active=filterTeams.includes(t.code);
+                      return(
+                        <button key={t.code} onClick={()=>toggleFilter(t.code)}
+                          style={{padding:"3px 8px",borderRadius:6,border:`1px solid ${active?"var(--accent)":"var(--border)"}`,background:active?"var(--accent)":"var(--card2)",color:active?"#000":"var(--muted)",cursor:"pointer",fontSize:11,fontWeight:600,display:"flex",alignItems:"center",gap:4,transition:"all .15s"}}>
+                          <span>{flag(t.team)}</span><span>{t.code}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
             {/* Content */}
             <div style={{overflowY:"auto",padding:"16px 20px",flex:1}}>
-              {allDupsList.length===0
-                ?<div style={{textAlign:"center",padding:32,color:"var(--muted)",fontSize:13}}>No tienes repetidas registradas.</div>
-                :(()=>{
-                  // Group by team
-                  const byTeam = {};
-                  allDupsList.forEach(d=>{
-                    const k=d.team;
-                    if(!byTeam[k]) byTeam[k]={group:d.group,items:[]};
-                    byTeam[k].items.push(d);
-                  });
-                  return Object.entries(byTeam).map(([team,{group,items}])=>(
+              {(()=>{
+                const filtered = filterTeams.length>0 ? allDupsList.filter(d=>filterTeams.includes(FIFA_CODE[d.team])||d.group==="ESP") : allDupsList;
+                if(filtered.length===0) return <div style={{textAlign:"center",padding:32,color:"var(--muted)",fontSize:13}}>{filterTeams.length>0?"Sin repetidas en las selecciones filtradas.":"No tienes repetidas registradas."}</div>;
+                const byTeam = {};
+                filtered.forEach(d=>{
+                  const k=d.team;
+                  if(!byTeam[k]) byTeam[k]={group:d.group,items:[]};
+                  byTeam[k].items.push(d);
+                });
+                return Object.entries(byTeam).map(([team,{group,items}])=>(
                     <div key={team} style={{marginBottom:16}}>
                       <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"var(--accent)",marginBottom:8,letterSpacing:1}}>
                         {group!=="ESP"&&<>{flag(team)} {FIFA_CODE[team]||team} · <span style={{color:"var(--muted)",fontSize:12}}>{team}</span></>}
@@ -399,40 +422,43 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
               }
             </div>
             {/* Footer total + export buttons */}
-            <div style={{padding:"12px 20px",borderTop:"1px solid var(--border)",background:"var(--card2)",display:"flex",flexDirection:"column",gap:10}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:12,color:"var(--muted)"}}>Total para intercambio</span>
-                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#8b5cf6"}}>{allDupsList.reduce((a,d)=>a+d.dups,0)}</span>
-              </div>
-              {allDupsList.length>0&&(
-                <div style={{display:"flex",gap:8}}>
-                  {/* Copy as text */}
-                  <button onClick={()=>{
-                    const lines=["🔁 MIS REPETIDAS PANINI MUNDIAL 2026",""];
-                    const byTeam={};
-                    allDupsList.forEach(d=>{const k=d.team;if(!byTeam[k])byTeam[k]=[];byTeam[k].push(d);});
-                    Object.entries(byTeam).forEach(([team,items])=>{
-                      lines.push(team==="Especiales"?"⭐ Especiales":`${team} (${items[0].code?.slice(0,3)||""})`);
-                      items.forEach(i=>lines.push(`  ${i.code} ×${i.dups}`));
-                      lines.push("");
-                    });
-                    lines.push(`Total: ${allDupsList.reduce((a,d)=>a+d.dups,0)} estampas`);
-                    navigator.clipboard.writeText(lines.join("\n")).then(()=>alert("¡Copiado al portapapeles!")).catch(()=>alert("No se pudo copiar"));
-                  }} style={{flex:1,padding:"9px 0",background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                    📋 Copiar texto
-                  </button>
-                  {/* Export as image */}
-                  <button onClick={()=>exportDupsImage(allDupsList)} style={{flex:1,padding:"9px 0",background:"#8b5cf6",border:"none",borderRadius:8,color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                    📥 Exportar imagen
-                  </button>
+            {(()=>{
+              const filteredD = filterTeams.length>0 ? allDupsList.filter(d=>filterTeams.includes(FIFA_CODE[d.team])||d.group==="ESP") : allDupsList;
+              return(
+                <div style={{padding:"12px 20px",borderTop:"1px solid var(--border)",background:"var(--card2)",display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:12,color:"var(--muted)"}}>Total{filterTeams.length>0?" (filtrado)":""} para intercambio</span>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#8b5cf6"}}>{filteredD.reduce((a,d)=>a+d.dups,0)}</span>
+                  </div>
+                  {filteredD.length>0&&(
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>{
+                        const lines=["🔁 MIS REPETIDAS PANINI MUNDIAL 2026",""];
+                        const byTeam={};
+                        filteredD.forEach(d=>{const k=d.team;if(!byTeam[k])byTeam[k]=[];byTeam[k].push(d);});
+                        Object.entries(byTeam).forEach(([team,items])=>{
+                          lines.push(team==="Especiales"?"Especiales":`${team}`);
+                          items.forEach(i=>lines.push(`  ${i.code} x${i.dups}`));
+                          lines.push("");
+                        });
+                        lines.push(`Total: ${filteredD.reduce((a,d)=>a+d.dups,0)} estampas`);
+                        navigator.clipboard.writeText(lines.join("\n")).then(()=>alert("Copiado!")).catch(()=>alert("No se pudo copiar"));
+                      }} style={{flex:1,padding:"9px 0",background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                        Copiar texto
+                      </button>
+                      <button onClick={()=>exportDupsImage(filteredD)} style={{flex:1,padding:"9px 0",background:"#8b5cf6",border:"none",borderRadius:8,color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                        Exportar imagen
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
 
-      {/* MISSING MODAL */}
+            {/* MISSING MODAL */}
       {showMissingModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:16}} onClick={()=>setShowMissingModal(false)}>
           <div style={{background:"var(--card)",border:"1px solid #ef4444",borderRadius:16,width:"100%",maxWidth:520,maxHeight:"80vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
@@ -440,10 +466,31 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#ef4444",letterSpacing:1}}>🔍 MIS FALTANTES ({allMissingList.length})</div>
               <button onClick={()=>setShowMissingModal(false)} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
             </div>
+            {/* Team Filter */}
+                {/* TEAM FILTER */}
+                <div style={{padding:"10px 16px",borderBottom:"1px solid var(--border)",background:"rgba(0,0,0,.2)"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <span style={{fontSize:10,color:"var(--muted)",letterSpacing:2,textTransform:"uppercase",flex:1}}>Filtrar por selección</span>
+                    {filterTeams.length>0&&<button onClick={clearFilter} style={{fontSize:10,padding:"2px 8px",background:"var(--card)",border:"1px solid var(--border)",borderRadius:5,color:"var(--muted)",cursor:"pointer"}}>Limpiar</button>}
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5,maxHeight:90,overflowY:"auto"}}>
+                    {allTeamsList.map(t=>{
+                      const active=filterTeams.includes(t.code);
+                      return(
+                        <button key={t.code} onClick={()=>toggleFilter(t.code)}
+                          style={{padding:"3px 8px",borderRadius:6,border:`1px solid ${active?"var(--accent)":"var(--border)"}`,background:active?"var(--accent)":"var(--card2)",color:active?"#000":"var(--muted)",cursor:"pointer",fontSize:11,fontWeight:600,display:"flex",alignItems:"center",gap:4,transition:"all .15s"}}>
+                          <span>{flag(t.team)}</span><span>{t.code}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
             <div style={{overflowY:"auto",padding:"16px 20px",flex:1}}>
               {(()=>{
+                const filteredM = filterTeams.length>0 ? allMissingList.filter(d=>filterTeams.includes(FIFA_CODE[d.team])||d.group==="ESP") : allMissingList;
+                if(filteredM.length===0) return <div style={{textAlign:"center",padding:32,color:"var(--muted)",fontSize:13}}>{filterTeams.length>0?"Sin faltantes en las selecciones filtradas. ¡Colección completa!":"¡No te falta ninguna!"}</div>;
                 const byTeam={};
-                allMissingList.forEach(d=>{
+                filteredM.forEach(d=>{
                   if(!byTeam[d.team])byTeam[d.team]={group:d.group,items:[]};
                   byTeam[d.team].items.push(d);
                 });
@@ -464,16 +511,19 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
                 ));
               })()}
             </div>
+            {(()=>{
+              const filteredM2 = filterTeams.length>0 ? allMissingList.filter(d=>filterTeams.includes(FIFA_CODE[d.team])||d.group==="ESP") : allMissingList;
+              return(
             <div style={{padding:"12px 20px",borderTop:"1px solid var(--border)",background:"var(--card2)",display:"flex",flexDirection:"column",gap:10}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:12,color:"var(--muted)"}}>Total estampas que necesito</span>
-                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#ef4444"}}>{allMissingList.length}</span>
+                <span style={{fontSize:12,color:"var(--muted)"}}>Total{filterTeams.length>0?" (filtrado)":""} que necesito</span>
+                <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:"#ef4444"}}>{filteredM2.length}</span>
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button onClick={()=>{
                   const lines=["🔍 MIS FALTANTES PANINI MUNDIAL 2026",""];
                   const byTeam={};
-                  allMissingList.forEach(d=>{if(!byTeam[d.team])byTeam[d.team]=[];byTeam[d.team].push(d.code);});
+                  filteredM2.forEach(d=>{if(!byTeam[d.team])byTeam[d.team]=[];byTeam[d.team].push(d.code);});
                   Object.entries(byTeam).forEach(([team,codes])=>{
                     lines.push(team==="Especiales"?"⭐ Especiales":`${team}`);
                     lines.push(`  ${codes.join(", ")}`);
@@ -484,12 +534,14 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
                 }} style={{flex:1,padding:"9px 0",background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,color:"var(--text)",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                   📋 Copiar texto
                 </button>
-                <button onClick={()=>exportMissingImage(allMissingList)}
+                <button onClick={()=>exportMissingImage(filteredM2)}
                   style={{flex:1,padding:"9px 0",background:"#ef4444",border:"none",borderRadius:8,color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
                   📥 Exportar imagen
                 </button>
               </div>
             </div>
+              );
+            })()}
           </div>
         </div>
       )}
