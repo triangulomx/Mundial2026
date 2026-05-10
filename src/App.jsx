@@ -874,6 +874,15 @@ export default function Mundial2026(){
       await set(ref(db,`panini/${paniniUid}/dups/${code}/${idx}`),count>0?count:null);
     }
   };
+  const paniniResetDups=async()=>{
+    // Delete all dups node — keeps teams and specials.owned intact
+    await set(ref(db,`panini/${paniniUid}/dups`),null);
+    // Also reset dups field in each special
+    const allSpecials=[...Array.from({length:19},(_,i)=>`FWC${String(i+1).padStart(2,"0")}`), ...Array.from({length:14},(_,i)=>`CC${String(i+1).padStart(2,"0")}`)];
+    const updates={};
+    allSpecials.forEach(c=>{ updates[`panini/${paniniUid}/specials/${c}/dups`]=null; });
+    await update(ref(db),updates);
+  };
 
   // ── Panini stats for home screen
   const paniniHomeStats = useMemo(() => {
@@ -1602,6 +1611,7 @@ export default function Mundial2026(){
               onToggleSpecial={paniniToggleSpecial}
               onSpecialLabel={paniniSpecialLabel}
               onDup={paniniDup}
+              onResetDups={paniniResetDups}
               isAdmin={isAdmin}
               userId={myId}
             />
