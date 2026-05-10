@@ -269,12 +269,14 @@ async function exportMissingImage(missingList) {
   link.click();
 }
 
-function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDup }) {
+function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDup, onResetDups }) {
   const [selGroup, setSelGroup] = useState(null);
   const [selTeam,  setSelTeam]  = useState(null);
   const [confirm,  setConfirm]  = useState(null);
   const [showDupsModal, setShowDupsModal] = useState(false);
   const [showMissingModal, setShowMissingModal] = useState(false);
+  const [showOwnedModal, setShowOwnedModal] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [filterTeams, setFilterTeams] = useState([]); // shared filter for both modals
 
   const allTeamsList = useMemo(()=>Object.entries(PANINI_GROUPS).flatMap(([g,teams])=>teams.map(t=>({team:t,code:FIFA_CODE[t],group:g}))),[]);
@@ -361,6 +363,80 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
         </div>
       )}
 
+      {/* CONFIRM RESET DUPS */}
+      {confirmReset&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:400,padding:16}}>
+          <div style={{background:"var(--card)",border:"1px solid var(--accent2)",borderRadius:14,padding:28,width:320,textAlign:"center"}}>
+            <div style={{fontSize:36,marginBottom:10}}>🗑</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"var(--accent2)",marginBottom:10}}>¿Resetear repetidas?</div>
+            <div style={{fontSize:12,color:"var(--muted)",marginBottom:20,lineHeight:1.7}}>Se borrarán todos los contadores de repetidas. Las estampas <strong style={{color:"var(--text)"}}>obtenidas no se modifican</strong>.</div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>{onResetDups();setConfirmReset(false);}} style={{flex:1,padding:10,background:"var(--accent2)",border:"none",borderRadius:8,color:"#fff",fontWeight:700,cursor:"pointer",fontSize:13}}>Sí, resetear</button>
+              <button onClick={()=>setConfirmReset(false)} style={{flex:1,padding:10,background:"var(--card2)",border:"1px solid var(--border)",borderRadius:8,color:"var(--muted)",cursor:"pointer",fontSize:13}}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OWNED MODAL - desglose por selección */}
+      {showOwnedModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:16}} onClick={()=>setShowOwnedModal(false)}>
+          <div style={{background:"var(--card)",border:"1px solid var(--accent)",borderRadius:16,width:"100%",maxWidth:560,maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+            <div style={{padding:"14px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--card2)"}}>
+              <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"var(--accent)",letterSpacing:1}}>📊 OBTENIDAS POR SELECCIÓN</div>
+              <button onClick={()=>setShowOwnedModal(false)} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
+            </div>
+            <div style={{overflowY:"auto",flex:1}}>
+              {/* Specials row */}
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",borderBottom:"1px solid var(--border)",background:"rgba(59,130,246,0.05)"}}>
+                <div style={{fontSize:18}}>⭐</div>
+                <div style={{flex:1}}>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"var(--blue)"}}>ESPECIALES</div>
+                  <div style={{height:4,background:"var(--border)",borderRadius:2,marginTop:4,overflow:"hidden"}}>
+                    <div style={{height:"100%",background:"var(--blue)",width:`${(specialsOwned/TOTAL_SPECIALS)*100}%`,transition:"width .5s"}}/>
+                  </div>
+                </div>
+                <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"var(--blue)",minWidth:50,textAlign:"right"}}>{specialsOwned}<span style={{fontSize:12,color:"var(--muted)"}}>/{TOTAL_SPECIALS}</span></div>
+                <div style={{fontSize:11,fontWeight:700,color:specialsOwned===TOTAL_SPECIALS?"var(--green)":"var(--muted)",minWidth:36,textAlign:"right"}}>{Math.round((specialsOwned/TOTAL_SPECIALS)*100)}%</div>
+              </div>
+              {/* Group headers + teams */}
+              {Object.entries(PANINI_GROUPS).map(([group,teams])=>(
+                <div key={group}>
+                  <div style={{padding:"6px 16px",background:"rgba(245,158,11,0.06)",borderBottom:"1px solid var(--border)"}}>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:13,color:"var(--accent)",letterSpacing:1}}>GRUPO {group}</span>
+                    <span style={{fontSize:12,color:"var(--muted)",marginLeft:10}}>{groupStats[group]?.owned}/{groupStats[group]?.total}</span>
+                  </div>
+                  {teams.map(team=>{
+                    const code=FIFA_CODE[team];
+                    const ts=teamStats[code]||{owned:0,total:20};
+                    const pct=Math.round((ts.owned/ts.total)*100);
+                    const color=pct===100?"var(--green)":pct>=50?"var(--accent)":"var(--muted)";
+                    return(
+                      <div key={code} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 16px",borderBottom:"1px solid rgba(28,45,66,.5)"}}>
+                        <div style={{fontSize:20}}>{flag(team)}</div>
+                        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:14,color:"var(--accent)",width:36}}>{code}</div>
+                        <div style={{flex:1}}>
+                          <div style={{height:5,background:"var(--border)",borderRadius:3,overflow:"hidden"}}>
+                            <div style={{height:"100%",background:color,width:`${pct}%`,transition:"width .5s"}}/>
+                          </div>
+                        </div>
+                        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:18,color,minWidth:48,textAlign:"right"}}>{ts.owned}<span style={{fontSize:11,color:"var(--muted)"}}>/{ts.total}</span></div>
+                        <div style={{fontSize:11,fontWeight:700,color,minWidth:36,textAlign:"right"}}>{pct}%</div>
+                        {pct===100&&<div style={{fontSize:14}}>✅</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+            <div style={{padding:"10px 20px",borderTop:"1px solid var(--border)",background:"var(--card2)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:12,color:"var(--muted)"}}>Total obtenidas</span>
+              <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"var(--accent)"}}>{totalTeams+specialsOwned}<span style={{fontSize:13,color:"var(--muted)"}}>/{GRAND_TOTAL}</span> · {Math.round(((totalTeams+specialsOwned)/GRAND_TOTAL)*100)}%</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* DUPS MODAL */}
       {showDupsModal&&(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:300,padding:16}} onClick={()=>setShowDupsModal(false)}>
@@ -368,7 +444,10 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
             {/* Header */}
             <div style={{padding:"16px 20px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--card2)"}}>
               <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"#8b5cf6",letterSpacing:1}}>🔁 MIS REPETIDAS ({allDupsList.length} estampas)</div>
-              <button onClick={()=>setShowDupsModal(false)} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                {allDupsList.length>0&&<button onClick={()=>setConfirmReset(true)} style={{padding:"5px 12px",background:"rgba(239,68,68,.15)",border:"1px solid var(--accent2)",borderRadius:7,color:"var(--accent2)",cursor:"pointer",fontSize:11,fontWeight:700}}>🗑 Reset</button>}
+                <button onClick={()=>setShowDupsModal(false)} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
+              </div>
             </div>
             {/* Team Filter */}
                 {/* TEAM FILTER */}
@@ -549,17 +628,17 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
       {/* STATS */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:10,marginBottom:16}}>
         {[
-          {label:"Total obtenidas",val:totalTeams+specialsOwned,total:GRAND_TOTAL,color:"var(--accent)"},
-          {label:"Equipos",val:totalTeams,total:TOTAL_TEAM_STICKERS,color:"var(--green)"},
+          {label:"Total obtenidas",val:totalTeams+specialsOwned,total:GRAND_TOTAL,color:"var(--accent)",onClick:()=>setShowOwnedModal(true)},
+          {label:"Equipos",val:totalTeams,total:TOTAL_TEAM_STICKERS,color:"var(--green)",onClick:()=>setShowOwnedModal(true)},
           {label:"Especiales",val:specialsOwned,total:TOTAL_SPECIALS,color:"var(--blue)"},
-          {label:"Repetidas",val:totalDups,total:null,color:"#8b5cf6"},
-          {label:"Faltantes",val:allMissingList.length,total:null,color:"#ef4444"},
+          {label:"Repetidas",val:totalDups,total:null,color:"#8b5cf6",onClick:()=>setShowDupsModal(true)},
+          {label:"Faltantes",val:allMissingList.length,total:null,color:"#ef4444",onClick:()=>setShowMissingModal(true)},
         ].map(s=>(
           <div key={s.label}
-            onClick={s.total===null&&s.val>0?(s.label==="Faltantes"?()=>setShowMissingModal(true):()=>setShowDupsModal(true)):undefined}
-            style={{background:"var(--card)",border:`1px solid ${s.total===null&&s.val>0?"#8b5cf6":"var(--border)"}`,borderRadius:10,padding:"12px 14px",cursor:s.total===null&&s.val>0?"pointer":"default",transition:"border-color .2s"}}>
+            onClick={s.onClick&&s.val>0?s.onClick:undefined}
+            style={{background:"var(--card)",border:`1px solid ${s.onClick&&s.val>0?s.color:"var(--border)"}`,borderRadius:10,padding:"12px 14px",cursor:s.onClick&&s.val>0?"pointer":"default",transition:"border-color .2s"}}>
             <div style={{fontSize:9,color:"var(--muted)",letterSpacing:2,textTransform:"uppercase",marginBottom:4}}>
-              {s.label}{s.total===null&&s.val>0&&<span style={{marginLeft:6,fontSize:9,color:"#8b5cf6"}}>VER →</span>}
+              {s.label}{s.onClick&&s.val>0&&<span style={{marginLeft:6,fontSize:9,color:s.color}}>VER →</span>}
             </div>
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:26,color:s.color,lineHeight:1}}>{s.val}{s.total!==null&&<span style={{fontSize:13,color:"var(--muted)"}}>/{s.total}</span>}</div>
             <div style={{height:3,background:"var(--border)",borderRadius:2,marginTop:6,overflow:"hidden"}}>
