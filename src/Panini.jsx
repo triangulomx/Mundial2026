@@ -277,6 +277,8 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
   const [showMissingModal, setShowMissingModal] = useState(false);
   const [showOwnedModal, setShowOwnedModal] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResult, setSearchResult] = useState(null);
   const [filterTeams, setFilterTeams] = useState([]); // shared filter for both modals
 
   const allTeamsList = useMemo(()=>Object.entries(PANINI_GROUPS).flatMap(([g,teams])=>teams.map(t=>({team:t,code:FIFA_CODE[t],group:g}))),[]);
@@ -341,6 +343,35 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
   };
 
   const typeColor = t => t==="stadium"?"#f59e0b":t==="team"?"#3b82f6":"var(--muted)";
+
+  const doSearch = (q) => {
+    const code = q.trim().toUpperCase();
+    if (!code) { setSearchResult(null); return; }
+
+    // Search in specials
+    const allSpecials = [...Array.from({length:19},(_,i)=>`FWC${String(i+1).padStart(2,"0")}`), ...Array.from({length:14},(_,i)=>`CC${String(i+1).padStart(2,"0")}`)];
+    if (allSpecials.includes(code)) {
+      const s = panini?.specials?.[code] || {};
+      setSearchResult({ code, type:"special", owned: !!s.owned, dups: s.dups||0, team:"Especiales", group:"ESP" });
+      return;
+    }
+
+    // Search in team stickers — find by FIFA code prefix
+    for (const [group, teams] of Object.entries(PANINI_GROUPS)) {
+      for (const team of teams) {
+        const fc = FIFA_CODE[team];
+        if (!code.startsWith(fc)) continue;
+        const stickers = buildStickers(team);
+        const idx = stickers.findIndex(s => s.code === code);
+        if (idx === -1) continue;
+        const owned = !!panini?.teams?.[fc]?.[idx];
+        const dups = panini?.dups?.[fc]?.[idx] || 0;
+        setSearchResult({ code, type:"team", owned, dups, team, group, fc, idx, sticker: stickers[idx] });
+        return;
+      }
+    }
+    setSearchResult({ code, type:"notfound" });
+  };
 
   return (
     <div>
@@ -647,6 +678,81 @@ function PaniniSection({ panini, onToggle, onToggleSpecial, onSpecialLabel, onDu
             </div>
           </div>
         ))}
+      </div>
+
+      {/* SEARCH BAR */}
+      <div style={{marginBottom:16}}>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <div style={{position:"relative",flex:1}}>
+            <input
+              value={searchQuery}
+              onChange={e=>{setSearchQuery(e.target.value);if(!e.target.value)setSearchResult(null);}}
+              onKeyDown={e=>e.key==="Enter"&&doSearch(searchQuery)}
+              placeholder="Buscar estampa... ej: MEX01, FWC03, CC07"
+              style={{width:"100%",padding:"10px 14px",paddingRight:40,background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,color:"var(--text)",fontSize:13,outline:"none",fontFamily:"'Barlow',sans-serif"}}
+              onFocus={e=>e.target.style.borderColor="var(--accent)"}
+              onBlur={e=>e.target.style.borderColor="var(--border)"}
+            />
+            {searchQuery&&<button onClick={()=>{setSearchQuery("");setSearchResult(null);}}
+              style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>}
+          </div>
+          <button onClick={()=>doSearch(searchQuery)}
+            style={{padding:"10px 20px",background:"var(--accent)",border:"none",borderRadius:10,color:"#000",fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:1,whiteSpace:"nowrap"}}>
+            🔍 Buscar
+          </button>
+        </div>
+
+        {/* SEARCH RESULT */}
+        {searchResult&&(
+          <div style={{marginTop:10,padding:"14px 16px",borderRadius:10,border:`2px solid ${
+            searchResult.type==="notfound"?"var(--accent2)":
+            searchResult.owned?"var(--green)":"var(--border)"}`,
+            background:searchResult.type==="notfound"?"rgba(239,68,68,0.07)":searchResult.owned?"rgba(16,185,129,0.08)":"var(--card2)",
+            display:"flex",alignItems:"center",gap:14}}>
+            {searchResult.type==="notfound"?(
+              <>
+                <div style={{fontSize:32}}>❓</div>
+                <div>
+                  <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"var(--accent2)"}}>{searchResult.code}</div>
+                  <div style={{fontSize:12,color:"var(--muted)"}}>Código no encontrado. Verifica que esté bien escrito.</div>
+                </div>
+              </>
+            ):(
+              <>
+                <div style={{fontSize:36}}>{searchResult.type==="special"?"⭐":flag(searchResult.team)}</div>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:22,color:"var(--accent)"}}>{searchResult.code}</span>
+                    {searchResult.type==="team"&&<span style={{fontSize:11,color:"var(--muted)"}}>{searchResult.team}</span>}
+                    {searchResult.type==="special"&&<span style={{fontSize:11,color:"var(--muted)"}}>Especiales</span>}
+                  </div>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {searchResult.owned?(
+                      <span style={{padding:"3px 10px",borderRadius:20,background:"rgba(16,185,129,0.2)",border:"1px solid var(--green)",fontSize:12,fontWeight:700,color:"var(--green)"}}>✓ Obtenida</span>
+                    ):(
+                      <span style={{padding:"3px 10px",borderRadius:20,background:"rgba(239,68,68,0.15)",border:"1px solid var(--accent2)",fontSize:12,fontWeight:700,color:"var(--accent2)"}}>✗ Faltante</span>
+                    )}
+                    {searchResult.owned&&searchResult.dups>0&&(
+                      <span style={{padding:"3px 10px",borderRadius:20,background:"rgba(139,92,246,0.15)",border:"1px solid #8b5cf6",fontSize:12,fontWeight:700,color:"#a78bfa"}}>🔁 {searchResult.dups} repetida{searchResult.dups>1?"s":""}</span>
+                    )}
+                    {searchResult.owned&&searchResult.dups===0&&(
+                      <span style={{padding:"3px 10px",borderRadius:20,background:"rgba(100,116,139,0.15)",border:"1px solid var(--border)",fontSize:12,color:"var(--muted)"}}>Sin repetidas</span>
+                    )}
+                  </div>
+                </div>
+                {/* Quick toggle */}
+                {searchResult.type==="team"&&(
+                  <button onClick={()=>{
+                    if(searchResult.owned) setConfirm({type:"team",code:searchResult.fc,idx:searchResult.idx});
+                    else { onToggle(searchResult.fc,searchResult.idx,true); setSearchResult(r=>({...r,owned:true})); }
+                  }} style={{padding:"8px 14px",borderRadius:8,border:`1px solid ${searchResult.owned?"var(--accent2)":"var(--green)"}`,background:searchResult.owned?"rgba(239,68,68,.1)":"rgba(16,185,129,.1)",color:searchResult.owned?"var(--accent2)":"var(--green)",cursor:"pointer",fontSize:12,fontWeight:700,whiteSpace:"nowrap"}}>
+                    {searchResult.owned?"✕ Desmarcar":"✓ Marcar"}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* BACK */}
